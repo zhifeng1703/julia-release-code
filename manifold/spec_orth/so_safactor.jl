@@ -17,8 +17,8 @@ mutable struct SAFactor
     vector::Ref{Matrix{Float64}}
     angle::Ref{Vector{Float64}}
     nza_cnt::Int
-    SAFactor(n) = new(Ref(Matrix{Float64}(undef, n, n)), Ref(Vector{Float64}(undef, div(n, 2))), 0);
-    SAFactor(V::Ref{Matrix{Float64}}, A::Ref{Vector{Float64}}, n::Int) = new(V, A, n);
+    SAFactor(n::Int) = new(Ref(Matrix{Float64}(undef, n, n)), Ref(Vector{Float64}(undef, div(n, 2))), 0)
+    SAFactor(V::Ref{Matrix{Float64}}, A::Ref{Vector{Float64}}, n::Int) = new(V, A, n)
 end
 
 function Base.show(io::IO, p::SAFactor)
@@ -47,46 +47,46 @@ get_wsp_saf_ord(n) = WSP(Matrix{Float64}(undef, n, n), Vector{Int}(undef, div(n,
 
 
 
-function SAFactor_order(saf::SAFactor, wsp_saf_ord::WSP = WSP(similar(saf.vector[]), similar(saf.angle[], Int)))
+function SAFactor_order(saf::SAFactor, wsp_saf_ord::WSP=WSP(similar(saf.vector[]), similar(saf.angle[], Int)))
     # Flip negative angles to positve by flipping the corresponding pair of real Schur vectors.
     # M will be reused as workspace as the angles information has been properly stored in saf.
     Mat = wsp_saf_ord[1]
     # Order the angles ay magnitude
-    p = wsp_saf_ord[2];             # div(n, 2) int vector.
-    len = 2 * size(Mat, 1);     # operating pairs of vectors
-    sVec = getVector(saf);
-    ang = getAngle(saf);
-    sortperm!(p, ang, by=abs, rev=true);
-    unsafe_copyto!(pointer(Mat), pointer(ang), length(ang));
+    p = wsp_saf_ord[2]             # div(n, 2) int vector.
+    len = 2 * size(Mat, 1)     # operating pairs of vectors
+    sVec = getVector(saf)
+    ang = getAngle(saf)
+    sortperm!(p, ang, by=abs, rev=true)
+    unsafe_copyto!(pointer(Mat), pointer(ang), length(ang))
     for ind in eachindex(ang)   # Reorder angles
-        @inbounds ang[ind] = Mat[p[ind]];
+        @inbounds ang[ind] = Mat[p[ind]]
     end
 
-    unsafe_copyto!(pointer(Mat), pointer(sVec), length(sVec));
+    unsafe_copyto!(pointer(Mat), pointer(sVec), length(sVec))
     for ind in eachindex(ang)   # Reorder pairs of Schur vectors
         @inbounds if ind == p[ind]
-            continue;
+            continue
         else
-            unsafe_copyto!(sVec, len * (ind - 1) + 1, Mat, len * (p[ind] - 1) + 1, len);
+            unsafe_copyto!(sVec, len * (ind - 1) + 1, Mat, len * (p[ind] - 1) + 1, len)
         end
     end
 end
 
-function SAFactor_regularize(saf::SAFactor, wsp_saf_reg::WSP = WSP(similar(saf.vector[])))
+function SAFactor_regularize(saf::SAFactor, wsp_saf_reg::WSP=WSP(similar(saf.vector[])))
     # Flip negative angles to positve by flipping the corresponding pair of real Schur vectors.
     # M will be reused as workspace as the angles information has been properly stored in saf.
     Mat = wsp_saf_reg[1]
-    len = size(Mat, 1);         # operating individal vectors within a pair
+    len = size(Mat, 1)         # operating individal vectors within a pair
     sVec = getVector(saf)
     ang = getAngle(saf)
 
-    unsafe_copyto!(pointer(Mat), pointer(sVec), length(sVec));
+    unsafe_copyto!(pointer(Mat), pointer(sVec), length(sVec))
     for ind in 1:saf.nza_cnt   # Reorder pairs of Schur vectors
         @inbounds if ang[ind] < 0
-            @inbounds ang[ind] = -ang[ind];
-            @inbounds unsafe_copyto!(Mat, 1, sVec, len * (2 * ind - 2) + 1, len);
-            @inbounds unsafe_copyto!(sVec, len * (2 * ind - 2) + 1, sVec, len * (2 * ind - 1) + 1, len);
-            @inbounds unsafe_copyto!(sVec, len * (2 * ind - 1) + 1, Mat, 1, len);
+            @inbounds ang[ind] = -ang[ind]
+            @inbounds unsafe_copyto!(Mat, 1, sVec, len * (2 * ind - 2) + 1, len)
+            @inbounds unsafe_copyto!(sVec, len * (2 * ind - 2) + 1, sVec, len * (2 * ind - 1) + 1, len)
+            @inbounds unsafe_copyto!(sVec, len * (2 * ind - 1) + 1, Mat, 1, len)
         end
     end
 end
@@ -100,33 +100,33 @@ end
 """
 function schurAngular_SkewSymm!(saf::SAFactor, M::Ref{Matrix{Float64}}, wsp_saf::WSP; order::Bool=true, regular::Bool=false)
 
-    MatTmp = wsp_saf[1];
+    MatTmp = wsp_saf[1]
     MatM = M[]
     unsafe_copyto!(pointer(MatTmp), pointer(MatM), length(MatM))
 
-    dgees!(wsp_saf(1), saf.vector, wsp_saf[3]; job = 'V', sort = 'S')
+    dgees!(wsp_saf(1), saf.vector, wsp_saf[3]; job='V', sort='S')
 
 
     saf.nza_cnt = 0
-    ang = getAngle(saf);
+    ang = getAngle(saf)
     for ind in eachindex(ang)
-        @inbounds ang[ind] = MatTmp[2*ind, 2*ind - 1]
+        @inbounds ang[ind] = MatTmp[2*ind, 2*ind-1]
     end
 
     for ind in eachindex(ang)
         @inbounds if abs(ang[ind]) > SAF_ANGLE_ABSTOL
             saf.nza_cnt += 1
         else
-            @inbounds ang[ind] = 0.0;
+            @inbounds ang[ind] = 0.0
         end
     end
 
     if order
-        SAFactor_order(saf, wsp_saf);
+        SAFactor_order(saf, wsp_saf)
     end
 
     if regular
-        SAFactor_regularize(saf, wsp_saf);
+        SAFactor_regularize(saf, wsp_saf)
     end
 
     # if order
@@ -134,7 +134,7 @@ function schurAngular_SkewSymm!(saf::SAFactor, M::Ref{Matrix{Float64}}, wsp_saf:
     #     # M will be reused as workspace as the angles information has been properly stored in saf.
     #     p = wsp_saf[1];             # div(n, 2) int vector.
     #     len = 2 * size(Mat, 1);     # operating pairs of vectors
-        
+
     #     sVec = getVector(saf)
 
     #     sortperm!(p, ang, by=abs, rev=true);
@@ -165,7 +165,7 @@ function schurAngular_SkewSymm!(saf::SAFactor, M::Ref{Matrix{Float64}}, wsp_saf:
     #     # M will be reused as workspace as the angles information has been properly stored in saf.
 
     #     len = size(Mat, 1);         # operating individal vectors within a pair
-        
+
     #     sVec = getVector(saf)
 
     #     unsafe_copyto!(Mat, 1, sVec, 1, length(sVec));
@@ -182,32 +182,32 @@ end
 
 function schurAngular_SpecOrth!(saf::SAFactor, M::Ref{Matrix{Float64}}, wsp_saf::WSP; order::Bool=true, regular::Bool=false)
 
-    MatTmp = wsp_saf[1];
+    MatTmp = wsp_saf[1]
     MatM = M[]
     unsafe_copyto!(pointer(MatTmp), pointer(MatM), length(MatM))
 
-    dgees!(wsp_saf(1), saf.vector, wsp_saf[3]; job = 'V', sort = 'S')
+    dgees!(wsp_saf(1), saf.vector, wsp_saf[3]; job='V', sort='S')
 
     saf.nza_cnt = 0
-    ang = getAngle(saf);
+    ang = getAngle(saf)
     for ind in eachindex(ang)
-        @inbounds ang[ind] = atan(MatTmp[2*ind, 2*ind - 1], MatTmp[2*ind, 2*ind])
+        @inbounds ang[ind] = atan(MatTmp[2*ind, 2*ind-1], MatTmp[2*ind, 2*ind])
     end
 
     for ind in eachindex(ang)
         @inbounds if abs(ang[ind]) > SAF_ANGLE_ABSTOL
             saf.nza_cnt += 1
         else
-            @inbounds ang[ind] = 0.0;
+            @inbounds ang[ind] = 0.0
         end
     end
 
     if order
-        SAFactor_order(saf, wsp_saf);
+        SAFactor_order(saf, wsp_saf)
     end
 
     if regular
-        SAFactor_regularize(saf, wsp_saf);
+        SAFactor_regularize(saf, wsp_saf)
     end
 
     # if order
@@ -215,7 +215,7 @@ function schurAngular_SpecOrth!(saf::SAFactor, M::Ref{Matrix{Float64}}, wsp_saf:
     #     # M will be reused as workspace as the angles information has been properly stored in saf.
     #     p = wsp_saf[1];             # div(n, 2) int vector.
     #     len = 2 * size(Mat, 1);     # operating pairs of vectors
-        
+
     #     sVec = getVector(saf)
 
     #     sortperm!(p, ang, by=abs, rev=true);
@@ -240,7 +240,7 @@ function schurAngular_SpecOrth!(saf::SAFactor, M::Ref{Matrix{Float64}}, wsp_saf:
     #     # M will be reused as workspace as the angles information has been properly stored in saf.
 
     #     len = size(Mat, 1);         # operating individal vectors within a pair
-        
+
     #     sVec = getVector(saf)
 
     #     unsafe_copyto!(pointer(Mat), pointer(sVec), length(sVec));
@@ -256,22 +256,22 @@ function schurAngular_SpecOrth!(saf::SAFactor, M::Ref{Matrix{Float64}}, wsp_saf:
 end
 
 
-function schurAngular_SkewSymm(M::Ref{Matrix{Float64}}, wsp_saf::WSP = get_wsp_saf(size(M[], 1)); order::Bool=true, regular::Bool=false)
-    MatM = M[];
-    MatW = copy(MatM);
-    W = Ref(MatW);
-    saf = SAFactor(size(MatM, 1));
-    schurAngular_SkewSymm!(saf, W, wsp_saf; order = order, regular = regular);
-    return saf;
+function schurAngular_SkewSymm(M::Ref{Matrix{Float64}}, wsp_saf::WSP=get_wsp_saf(size(M[], 1)); order::Bool=true, regular::Bool=false)
+    MatM = M[]
+    MatW = copy(MatM)
+    W = Ref(MatW)
+    saf = SAFactor(size(MatM, 1))
+    schurAngular_SkewSymm!(saf, W, wsp_saf; order=order, regular=regular)
+    return saf
 end
 
-function schurAngular_SpecOrth(M::Ref{Matrix{Float64}}, wsp_saf::WSP = get_wsp_saf(size(M[], 1)); order::Bool=true, regular::Bool=false)
-    MatM = M[];
-    MatW = copy(MatM);
-    W = Ref(MatW);
-    saf = SAFactor(size(MatM, 1));
-    schurAngular_SpecOrth!(saf, W, wsp_saf; order = order, regular = regular);
-    return saf;
+function schurAngular_SpecOrth(M::Ref{Matrix{Float64}}, wsp_saf::WSP=get_wsp_saf(size(M[], 1)); order::Bool=true, regular::Bool=false)
+    MatM = M[]
+    MatW = copy(MatM)
+    W = Ref(MatW)
+    saf = SAFactor(size(MatM, 1))
+    schurAngular_SpecOrth!(saf, W, wsp_saf; order=order, regular=regular)
+    return saf
 end
 
 # function schurAngular_SpecOrth!(saf::SAFactor, M::Ref{Matrix{Float64}}, wsp_saf::WSP; order::Bool=true, regular::Bool=false)
@@ -298,7 +298,7 @@ end
 #         # M will be reused as workspace as the angles information has been properly stored in saf.
 #         p = wsp_saf[1];             # div(n, 2) int vector.
 #         len = 2 * size(Mat, 1);     # operating pairs of vectors
-        
+
 #         sVec = getVector(saf)
 
 #         sortperm!(p, ang, by=abs, rev=true);
@@ -322,7 +322,7 @@ end
 #         # M will be reused as workspace as the angles information has been properly stored in saf.
 
 #         len = size(Mat, 1);         # operating individal vectors within a pair
-        
+
 #         sVec = getVector(saf)
 
 #         copyto!(Mat, sVec);
@@ -438,7 +438,7 @@ end
 #         #         MatM[r_ind, r_ind] += t1;
 #         #     end
 #         # end
-    
+
 #         # if 2 * m != n
 #         #     for v_ind = (2 * m + 1):n
 #         #         for r_ind in axes(MatM, 1)
@@ -454,7 +454,7 @@ end
 #         #     end
 #         # end
 #     # else
-        
+
 #         # for a_ind in 1:m
 #         #     @inbounds cosine = cos(scale * VecA[a_ind])
 #         #     @inbounds sine = sin(scale * VecA[a_ind])
@@ -470,7 +470,7 @@ end
 #         #         MatM[r_ind, r_ind] += t1;
 #         #     end
 #         # end
-    
+
 #         # if 2 * m != n
 #         #     for v_ind = (2 * m + 1):n
 #         #         for r_ind in axes(MatM, 1)
@@ -523,196 +523,196 @@ end
 # end
 
 
-@inline computeSkewSymm!(M::Ref{Matrix{Float64}}, saf::SAFactor, scale::Float64) = cong_SkewSymm_Angle!(M, saf.vector, saf.angle, saf.nza_cnt, scale; trans = false)
-@inline computeSkewSymm!(M::Ref{Matrix{Float64}}, saf::SAFactor) = cong_SkewSymm_Angle!(M, saf.vector, saf.angle, saf.nza_cnt; trans = false)
+@inline computeSkewSymm!(M::Ref{Matrix{Float64}}, saf::SAFactor, scale::Float64) = cong_SkewSymm_Angle!(M, saf.vector, saf.angle, saf.nza_cnt, scale; trans=false)
+@inline computeSkewSymm!(M::Ref{Matrix{Float64}}, saf::SAFactor) = cong_SkewSymm_Angle!(M, saf.vector, saf.angle, saf.nza_cnt; trans=false)
 
-@inline computeSpecOrth!(M::Ref{Matrix{Float64}}, saf::SAFactor, scale::Float64) = cong_SpecOrth_Angle!(M, saf.vector, saf.angle, saf.nza_cnt, scale; trans = false)
-@inline computeSpecOrth!(M::Ref{Matrix{Float64}}, saf::SAFactor) = cong_SpecOrth_Angle!(M, saf.vector, saf.angle, saf.nza_cnt; trans = false)
+@inline computeSpecOrth!(M::Ref{Matrix{Float64}}, saf::SAFactor, scale::Float64) = cong_SpecOrth_Angle!(M, saf.vector, saf.angle, saf.nza_cnt, scale; trans=false)
+@inline computeSpecOrth!(M::Ref{Matrix{Float64}}, saf::SAFactor) = cong_SpecOrth_Angle!(M, saf.vector, saf.angle, saf.nza_cnt; trans=false)
 
-function computeSkewSymm(saf::SAFactor, scale::Float64) 
+function computeSkewSymm(saf::SAFactor, scale::Float64)
     n = size(saf.vector[], 1)
-    M = Matrix{Float64}(undef, n, n);
+    M = Matrix{Float64}(undef, n, n)
     computeSkewSymm!(Ref(M), saf, scale)
-    return M;
+    return M
 end
 
-function computeSkewSymm(saf::SAFactor) 
+function computeSkewSymm(saf::SAFactor)
     n = size(saf.vector[], 1)
-    M = Matrix{Float64}(undef, n, n);
+    M = Matrix{Float64}(undef, n, n)
     computeSkewSymm!(Ref(M), saf)
-    return M;
+    return M
 end
 
-function computeSpecOrth(saf::SAFactor, scale::Float64) 
+function computeSpecOrth(saf::SAFactor, scale::Float64)
     n = size(saf.vector[], 1)
-    M = Matrix{Float64}(undef, n, n);
+    M = Matrix{Float64}(undef, n, n)
     computeSpecOrth!(Ref(M), saf, scale)
-    return M;
+    return M
 end
 
-function computeSpecOrth(saf::SAFactor) 
+function computeSpecOrth(saf::SAFactor)
     n = size(saf.vector[], 1)
-    M = Matrix{Float64}(undef, n, n);
+    M = Matrix{Float64}(undef, n, n)
     computeSpecOrth!(Ref(M), saf)
-    return M;
+    return M
 end
 
 #######################################Test functions#######################################
 
 using BenchmarkTools
 
-function test_congruence(n = 10)
-    A = rand(div(n, 2));
-    P = rand(n, n);
-    S = rand(n, n);
-    S .-= S';
-    
-    DA = zeros(n, n);
-    DCS = zeros(n, n);
+function test_congruence(n=10)
+    A = rand(div(n, 2))
+    P = rand(n, n)
+    S = rand(n, n)
+    S .-= S'
+
+    DA = zeros(n, n)
+    DCS = zeros(n, n)
     for a_ind in eachindex(A)
         ang = A[a_ind]
-        DA[2 * a_ind, 2 * a_ind - 1] = ang;
-        DA[2 * a_ind - 1, 2 * a_ind] = -ang;
+        DA[2*a_ind, 2*a_ind-1] = ang
+        DA[2*a_ind-1, 2*a_ind] = -ang
 
-        DCS[2 * a_ind, 2 * a_ind - 1] = sin(ang);
-        DCS[2 * a_ind - 1, 2 * a_ind] = -sin(ang);
-        DCS[2 * a_ind - 1, 2 * a_ind - 1] = cos(ang);
-        DCS[2 * a_ind , 2 * a_ind] = cos(ang);
+        DCS[2*a_ind, 2*a_ind-1] = sin(ang)
+        DCS[2*a_ind-1, 2*a_ind] = -sin(ang)
+        DCS[2*a_ind-1, 2*a_ind-1] = cos(ang)
+        DCS[2*a_ind, 2*a_ind] = cos(ang)
     end
     if isodd(n)
-        DCS[n, n] = 1.0;
+        DCS[n, n] = 1.0
     end
 
-    congA = similar(P);
-    congruenceAngle!(Ref(congA), Ref(P), Ref(A));
-    PAPT = P * DA * P';
+    congA = similar(P)
+    congruenceAngle!(Ref(congA), Ref(P), Ref(A))
+    PAPT = P * DA * P'
 
-    congCS = similar(P);
-    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A));
-    PCSPT = P * DCS * P';
+    congCS = similar(P)
+    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A))
+    PCSPT = P * DCS * P'
 
 
     println(PAPT ≈ congA)
     println(PCSPT ≈ congCS)
 
-    congruenceAngle!(Ref(congA), Ref(P), Ref(A); transpose = true);
-    PTAP = P' * DA * P;
+    congruenceAngle!(Ref(congA), Ref(P), Ref(A); transpose=true)
+    PTAP = P' * DA * P
 
-    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A); transpose = true);
-    PTCSP = P' * DCS * P;
+    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A); transpose=true)
+    PTCSP = P' * DCS * P
 
     println(PTAP ≈ congA)
     println(PTCSP ≈ congCS)
 
 end
 
-function test_congSkewSymm_speed(n = 10)
+function test_congSkewSymm_speed(n=10)
     # congruenceSkewSymm is bad for n > 12
-    MatP = rand(n, n);
-    MatS = rand(n, n);
-    MatS .-= MatS';
+    MatP = rand(n, n)
+    MatS = rand(n, n)
+    MatS .-= MatS'
 
     MatM = similar(MatS)
 
-    cS1 = similar(MatS);
-    cS2 = similar(MatS);
+    cS1 = similar(MatS)
+    cS2 = similar(MatS)
 
-    S = Ref(MatS);
-    P = Ref(MatP);
-    cS = Ref(cS1);
+    S = Ref(MatS)
+    P = Ref(MatP)
+    cS = Ref(cS1)
 
 
     println("congruenceSkewSymm computation time:")
-    @time congruenceSkewSymm!(cS, P, S; transpose = false)
+    @time congruenceSkewSymm!(cS, P, S; transpose=false)
 
     println("direct matrix multiplication time:")
     @time begin
-        mul!(MatM, MatP', MatS);
-        mul!(cS2, MatM, MatP);
+        mul!(MatM, MatP', MatS)
+        mul!(cS2, MatM, MatP)
     end
 
-    println("Same result?\t", cS1 ≈ cS2);
+    println("Same result?\t", cS1 ≈ cS2)
 end
 
-function test_congAngle_speed(n = 10)
+function test_congAngle_speed(n=10)
     # congruenceSkewSymm is bad for n > 12
-    MatP = rand(n, n);
-    VecA = rand(div(n, 2));
+    MatP = rand(n, n)
+    VecA = rand(div(n, 2))
 
     MatA = similar(MatP)
     MatM = similar(MatP)
 
-    cS1 = similar(MatP);
-    cS2 = similar(MatP);
+    cS1 = similar(MatP)
+    cS2 = similar(MatP)
 
-    A = Ref(VecA);
-    P = Ref(MatP);
-    cS = Ref(cS1);
+    A = Ref(VecA)
+    P = Ref(MatP)
+    cS = Ref(cS1)
 
 
     println("congruenceAngle computation time:")
-    @time congruenceAngle!(cS, P, A; transpose = false)
+    @time congruenceAngle!(cS, P, A; transpose=false)
 
     println("direct matrix multiplication time:")
     @time begin
-        fill!(MatA, 0.0);
+        fill!(MatA, 0.0)
         for ind in eachindex(VecA)
-            MatA[2 * ind - 1, 2 * ind] = -VecA[ind];
-            MatA[2 * ind, 2 * ind - 1] = VecA[ind];
+            MatA[2*ind-1, 2*ind] = -VecA[ind]
+            MatA[2*ind, 2*ind-1] = VecA[ind]
         end
-        mul!(MatM, MatP, MatA);
-        mul!(cS2, MatM, MatP');
+        mul!(MatM, MatP, MatA)
+        mul!(cS2, MatM, MatP')
     end
 
-    println("Same result?\t", cS1 ≈ cS2);
+    println("Same result?\t", cS1 ≈ cS2)
 end
 
-function test_congCosSin_speed(n = 10)
+function test_congCosSin_speed(n=10)
     # congruenceSkewSymm is bad for n > 12
-    MatP = rand(n, n);
-    VecA = rand(div(n, 2));
+    MatP = rand(n, n)
+    VecA = rand(div(n, 2))
 
     MatA = similar(MatP)
     MatM = similar(MatP)
 
-    cS1 = similar(MatP);
-    cS2 = similar(MatP);
+    cS1 = similar(MatP)
+    cS2 = similar(MatP)
 
-    A = Ref(VecA);
-    P = Ref(MatP);
-    cS = Ref(cS1);
+    A = Ref(VecA)
+    P = Ref(MatP)
+    cS = Ref(cS1)
 
 
     println("congruenceAngle computation time:")
-    @time congruenceCosSin!(cS, P, A; transpose = false)
+    @time congruenceCosSin!(cS, P, A; transpose=false)
 
     println("direct matrix multiplication time:")
     @time begin
-        fill!(MatA, 0.0);
+        fill!(MatA, 0.0)
         for ind in eachindex(VecA)
-            MatA[2 * ind - 1, 2 * ind] = -sin(VecA[ind]);
-            MatA[2 * ind, 2 * ind - 1] = sin(VecA[ind]);
-            MatA[2 * ind - 1, 2 * ind - 1] = cos(VecA[ind]);
-            MatA[2 * ind, 2 * ind] = cos(VecA[ind]);
+            MatA[2*ind-1, 2*ind] = -sin(VecA[ind])
+            MatA[2*ind, 2*ind-1] = sin(VecA[ind])
+            MatA[2*ind-1, 2*ind-1] = cos(VecA[ind])
+            MatA[2*ind, 2*ind] = cos(VecA[ind])
         end
         if isodd(n)
-            MatA[n, n] = 1.0;
+            MatA[n, n] = 1.0
         end
-        mul!(MatM, MatP, MatA);
-        mul!(cS2, MatM, MatP');
+        mul!(MatM, MatP, MatA)
+        mul!(cS2, MatM, MatP')
     end
 
-    println("Same result?\t", cS1 ≈ cS2);
+    println("Same result?\t", cS1 ≈ cS2)
 end
 
 function test_saf(n=10)
-    M = rand(n, n);
-    M .-= M';
+    M = rand(n, n)
+    M .-= M'
     M .*= 4π
-    eM = exp(M);
+    eM = exp(M)
     M_saf = schurAngular_SkewSymm(Ref(M))
     eM_saf = schurAngular_SpecOrth(Ref(eM))
-    eMr_saf = schurAngular_SpecOrth(Ref(eM); order = true, regular = true)
+    eMr_saf = schurAngular_SpecOrth(Ref(eM); order=true, regular=true)
 
 
 
@@ -734,15 +734,15 @@ function test_saf(n=10)
 
 end
 
-function test_saf_speed(n = 10)
-    M = rand(n, n);
-    M .-= M';
+function test_saf_speed(n=10)
+    M = rand(n, n)
+    M .-= M'
 
     println("Eigen decomposition computation time:")
-    @btime eigen($M);
+    @btime eigen($M)
 
     println("Real Schur decomposition computation time:")
-    @btime schurAngular_SkewSymm(Ref($M); regular = false, order = false);
+    @btime schurAngular_SkewSymm(Ref($M); regular=false, order=false)
     return nothing
 end
 

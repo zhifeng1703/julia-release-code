@@ -6,124 +6,144 @@ include("LAPACK_setup.jl")
 @inline get_wsp_cong(n::Int, m::Int) = WSP(Matrix{Float64}(undef, n, m));
 @inline get_wsp_cong(n::Int) = WSP(Matrix{Float64}(undef, n, n));
 
-function cong_dense!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, pos::Int, C::Ref{Matrix{Float64}}, cos::Int, dim::Int, wsp_cong::WSP = get_wsp_cong(size(P[], 1), dim); trans = false)
-    MatTemp = wsp_cong[1];
-    MatM = M[];
-    MatP = P[];
-    MatC = C[];
+function cong_dense!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, pos::Int, C::Ref{Matrix{Float64}}, cos::Int, dim::Int, wsp_cong::WSP=get_wsp_cong(size(P[], 1), dim); trans=false)
+    MatTemp = wsp_cong[1]
+    MatM = M[]
+    MatP = P[]
+    MatC = C[]
 
     # full_dim = size(MatM, 1);
     # core_dim = ed - os;
     if trans
-        mul!(MatTemp, view(MatP, (pos + 1):(pos + dim), :)', view(MatC, (cos + 1):(cos + dim), (cos + 1):(cos + dim)));
-        mul!(MatM, MatTemp, view(MatP, (pos + 1):(pos + dim), :));
+        mul!(MatTemp, view(MatP, (pos+1):(pos+dim), :)', view(MatC, (cos+1):(cos+dim), (cos+1):(cos+dim)))
+        mul!(MatM, MatTemp, view(MatP, (pos+1):(pos+dim), :))
     else
-        mul!(MatTemp, view(MatP, :, (pos + 1):(pos + dim)), view(MatC, (cos + 1):(cos + dim), (cos + 1):(cos + dim)));
-        mul!(MatM, MatTemp, view(MatP, :, (pos + 1):(pos + dim))');
+        mul!(MatTemp, view(MatP, :, (pos+1):(pos+dim)), view(MatC, (cos+1):(cos+dim), (cos+1):(cos+dim)))
+        mul!(MatM, MatTemp, view(MatP, :, (pos+1):(pos+dim))')
     end
     return M
 end
 
-function cong_dense!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, C::Ref{Matrix{Float64}}, wsp_cong::WSP = get_wsp_cong(size(P[], 1), size(C[], 1)); trans = false)
+function cong_dense!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, C::Ref{Matrix{Float64}}, wsp_cong::WSP=get_wsp_cong(size(P[], 1), size(C[], 1)); trans=false)
 
-    MatTemp = wsp_cong[1];
+    MatTemp = wsp_cong[1]
 
-    MatM = M[];
-    MatP = P[];
-    MatC = C[];
+    MatM = M[]
+    MatP = P[]
+    MatC = C[]
 
     # full_dim = size(MatM, 1);
     # core_dim = ed - os;
     if trans
-        mul!(MatTemp, MatP', MatC);
-        mul!(MatM, MatTemp, MatP);
+        mul!(MatTemp, MatP', MatC)
+        mul!(MatM, MatTemp, MatP)
     else
-        mul!(MatTemp, MatP, MatC);
-        mul!(MatM, MatTemp, MatP');
+        mul!(MatTemp, MatP, MatC)
+        mul!(MatM, MatTemp, MatP')
     end
     return M
 end
 
-function cong_dense!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, wsp_cong::WSP = get_wsp_cong(size(P[], 1), size(C[], 1)); trans = false)
+function cong_dense!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, wsp_cong::WSP=get_wsp_cong(size(P[], 1), size(C[], 1)); trans=false)
 
-    MatTemp = wsp_cong[1];
+    MatTemp = wsp_cong[1]
 
-    MatM = M[];
-    MatP = P[];
+    MatM = M[]
+    MatP = P[]
 
     # full_dim = size(MatM, 1);
     # core_dim = ed - os;
     if trans
-        mul!(MatTemp, MatP', MatM);
-        mul!(MatM, MatTemp, MatP);
+        mul!(MatTemp, MatP', MatM)
+        mul!(MatM, MatTemp, MatP)
     else
-        mul!(MatTemp, MatP, MatM);
-        mul!(MatM, MatTemp, MatP');
+        mul!(MatTemp, MatP, MatM)
+        mul!(MatM, MatTemp, MatP')
     end
     return M
 end
 
-function cong_dense!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, C::Ref{Matrix{Float64}}, os::Int, ed::Int, wsp_cong::WSP = get_wsp_cong(size(P[], 1), size(C[], 1)); trans = false)
+function cong_dense!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, C::Ref{Matrix{Float64}}, os::Int, ed::Int, wsp_cong::WSP=get_wsp_cong(size(P[], 1), size(C[], 1)); trans=false)
 
-    MatTemp = wsp_cong[1];
+    MatTemp = wsp_cong[1]
 
-    MatM = M[];
-    MatP = P[];
-    MatC = C[];
+    MatM = M[]
+    MatP = P[]
+    MatC = C[]
 
     # full_dim = size(MatM, 1);
     # core_dim = ed - os;
 
     if os == 0 && ed == size(M, 1)
-        return cong_dense!(M, P, C, wsp_cong; trans = trans);
+        return cong_dense!(M, P, C, wsp_cong; trans=trans)
     end
 
 
     if trans
-        viewP = view(MatP, (os + 1):ed, :);
-        mul!(view(MatTemp, :, (os + 1):ed), viewP', view(MatC, (os + 1):ed, (os + 1):ed));
-        mul!(MatM, view(MatTemp, :, (os + 1):ed), viewP);
+        viewP = view(MatP, (os+1):ed, :)
+        mul!(view(MatTemp, :, (os+1):ed), viewP', view(MatC, (os+1):ed, (os+1):ed))
+        mul!(MatM, view(MatTemp, :, (os+1):ed), viewP)
     else
-        viewP = view(MatP, :, (os + 1):ed);
-        mul!(view(MatTemp, :, (os + 1):ed), viewP, view(MatC, (os + 1):ed, (os + 1):ed));
-        mul!(MatM, view(MatTemp, :, (os + 1):ed), viewP');
+        viewP = view(MatP, :, (os+1):ed)
+        mul!(view(MatTemp, :, (os+1):ed), viewP, view(MatC, (os+1):ed, (os+1):ed))
+        mul!(MatM, view(MatTemp, :, (os+1):ed), viewP')
     end
-    return M;
+    return M
 end
 
-function cong_SkewSymm_dense!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, C::Ref{Matrix{Float64}}, wsp_cong::WSP = get_wsp_cong(size(P[], 1), size(C[], 1)); trans = false)
+function cong_SkewSymm_dense!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, C::Ref{Matrix{Float64}}, wsp_cong::WSP=get_wsp_cong(size(P[], 1), size(C[], 1)); trans=false)
 
-    MatTemp = wsp_cong[1];
+    MatTemp = wsp_cong[1]
 
-    MatM = M[];
-    MatP = P[];
-    MatC = C[];
+    MatM = M[]
+    MatP = P[]
+    MatC = C[]
 
     # full_dim = size(MatM, 1);
     # core_dim = ed - os;
     if trans
-        mul!(MatTemp, MatP', LowerTriangular(MatC));
-        mul!(MatM, MatTemp, MatP);
+        mul!(MatTemp, MatP', LowerTriangular(MatC))
+        mul!(MatM, MatTemp, MatP)
     else
-        mul!(MatTemp, MatP, LowerTriangular(MatC));
-        mul!(MatM, MatTemp, MatP');
+        mul!(MatTemp, MatP, LowerTriangular(MatC))
+        mul!(MatM, MatTemp, MatP')
     end
 
     # Recover skew-symmetry in the output
 
     for c_ind in axes(MatM, 1)
-        for r_ind in 1:(c_ind - 1)
-            @inbounds MatM[r_ind, c_ind] -= MatM[c_ind, r_ind];
-            @inbounds MatM[c_ind, r_ind] = -MatM[r_ind, c_ind];
+        for r_ind in 1:(c_ind-1)
+            @inbounds MatM[r_ind, c_ind] -= MatM[c_ind, r_ind]
+            @inbounds MatM[c_ind, r_ind] = -MatM[r_ind, c_ind]
         end
-        @inbounds MatM[c_ind, c_ind] = 0.0;
+        @inbounds MatM[c_ind, c_ind] = 0.0
     end
 
     return M
 end
 
+function cong_Eigen!(M::Ref{Matrix{Float64}}, E::Eigen{Float64,Float64,Matrix{Float64},Vector{Float64}}, wsp_cong::WSP=get_wsp_cong(size(M[])...); trans=false)
+
+    MatM = M[]
+
+    MatTemp = wsp_cong[1]
+
+    if trans
+        copy!(MatTemp, E.vectors)
+        lmul!(Diagonal(E.values), MatTemp)
+        mul!(MatM, E.vectors', MatTemp)
+    else
+        copy!(MatTemp, E.vectors')
+        lmul!(Diagonal(E.values), MatTemp)
+        mul!(MatM, E.vectors, MatTemp)
+    end
+
+    return M
+
+end
+
 # function cong_SkewSymm_DenseBlk!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, C::Ref{Matrix{Float64}}, wsp_cong::WSP = get_wsp_cong(size(P[], 1), size(C[], 1)); trans = false, r_os::Int = 0, c_os::Int = 0, r_ed::Int = size(C[], 1), c_ed::Int = size(C[], 1))
-    
+
 #     MatTemp = wsp_cong[1];
 
 #     MatM = M[];
@@ -172,10 +192,10 @@ cong_SkewSymm_Angle!(M, P, A, m, α<:Real; trans = false) -> M::Ref{Matrix{Float
 
 """
 
-function cong_SkewSymm_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, A::Ref{Vector{Float64}}, m::Int = length(A[]); trans::Bool = false)
-    MatM = M[];
-    MatP = P[];
-    VecA = A[];
+function cong_SkewSymm_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, A::Ref{Vector{Float64}}, m::Int=length(A[]); trans::Bool=false)
+    MatM = M[]
+    MatP = P[]
+    VecA = A[]
 
     fill!(MatM, 0.0)
 
@@ -203,18 +223,18 @@ function cong_SkewSymm_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, 
     end
 
     for c_ind = axes(MatM, 2)
-        for r_ind = (c_ind + 1):size(MatM, 1)
-            @inbounds MatM[r_ind, c_ind] -= MatM[c_ind, r_ind];
-            @inbounds MatM[c_ind, r_ind] = -MatM[r_ind, c_ind];
+        for r_ind = (c_ind+1):size(MatM, 1)
+            @inbounds MatM[r_ind, c_ind] -= MatM[c_ind, r_ind]
+            @inbounds MatM[c_ind, r_ind] = -MatM[r_ind, c_ind]
         end
-        MatM[c_ind, c_ind] = 0.0;
+        MatM[c_ind, c_ind] = 0.0
     end
 end
 
-function cong_SkewSymm_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, A::Ref{Vector{Float64}}, m::Int, scale::Float64; trans::Bool = false)
-    MatM = M[];
-    MatP = P[];
-    VecA = A[];
+function cong_SkewSymm_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, A::Ref{Vector{Float64}}, m::Int, scale::Float64; trans::Bool=false)
+    MatM = M[]
+    MatP = P[]
+    VecA = A[]
 
     fill!(MatM, 0.0)
 
@@ -242,11 +262,11 @@ function cong_SkewSymm_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, 
     end
 
     for c_ind = axes(MatM, 2)
-        for r_ind = (c_ind + 1):size(MatM, 1)
-            @inbounds MatM[r_ind, c_ind] -= MatM[c_ind, r_ind];
-            @inbounds MatM[c_ind, r_ind] = -MatM[r_ind, c_ind];
+        for r_ind = (c_ind+1):size(MatM, 1)
+            @inbounds MatM[r_ind, c_ind] -= MatM[c_ind, r_ind]
+            @inbounds MatM[c_ind, r_ind] = -MatM[r_ind, c_ind]
         end
-        MatM[c_ind, c_ind] = 0.0;
+        MatM[c_ind, c_ind] = 0.0
     end
 end
 
@@ -273,10 +293,10 @@ Run `test_cong_SpecOrth_Angle_speed(n)` to see the performances.
 Same task as ``cong_SpecOrth_Angle!(M, P, A, [m = length(A[])]; trans = false)`` with `D` scaled by `α`.
 
 """
-function cong_SpecOrth_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, A::Ref{Vector{Float64}}, m::Int = length(A[]); trans::Bool = false)
-    MatM = M[];
-    MatP = P[];
-    VecA = A[];
+function cong_SpecOrth_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, A::Ref{Vector{Float64}}, m::Int=length(A[]); trans::Bool=false)
+    MatM = M[]
+    MatP = P[]
+    VecA = A[]
 
     fill!(MatM, 0.0)
 
@@ -304,11 +324,11 @@ function cong_SpecOrth_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, 
     end
 
     for c_ind = axes(MatM, 2)
-        for r_ind = (c_ind + 1):size(MatM, 1)
-            @inbounds MatM[r_ind, c_ind] -= MatM[c_ind, r_ind];
-            @inbounds MatM[c_ind, r_ind] = -MatM[r_ind, c_ind];
+        for r_ind = (c_ind+1):size(MatM, 1)
+            @inbounds MatM[r_ind, c_ind] -= MatM[c_ind, r_ind]
+            @inbounds MatM[c_ind, r_ind] = -MatM[r_ind, c_ind]
         end
-        MatM[c_ind, c_ind] = 0.0;
+        MatM[c_ind, c_ind] = 0.0
     end
 
     d_ind::Int = 1
@@ -316,15 +336,15 @@ function cong_SpecOrth_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, 
         @inbounds BLAS.ger!(cos(VecA[a_ind]), view(MatP, :, 2 * a_ind - 1), view(MatP, :, 2 * a_ind - 1), MatM)
         @inbounds BLAS.ger!(cos(VecA[a_ind]), view(MatP, :, 2 * a_ind), view(MatP, :, 2 * a_ind), MatM)
     end
-    for d_ind in (2m + 1):size(MatM, 1)
-        @inbounds BLAS.ger!(1.0, view(MatP, :, d_ind), view(MatP, :, d_ind), MatM);
+    for d_ind in (2m+1):size(MatM, 1)
+        @inbounds BLAS.ger!(1.0, view(MatP, :, d_ind), view(MatP, :, d_ind), MatM)
     end
 end
 
-function cong_SpecOrth_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, A::Ref{Vector{Float64}}, m::Int, scale::Float64; trans::Bool = false)
-    MatM = M[];
-    MatP = P[];
-    VecA = A[];
+function cong_SpecOrth_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, A::Ref{Vector{Float64}}, m::Int, scale::Float64; trans::Bool=false)
+    MatM = M[]
+    MatP = P[]
+    VecA = A[]
 
     fill!(MatM, 0.0)
 
@@ -352,11 +372,11 @@ function cong_SpecOrth_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, 
     end
 
     for c_ind = axes(MatM, 2)
-        for r_ind = (c_ind + 1):size(MatM, 1)
-            @inbounds MatM[r_ind, c_ind] -= MatM[c_ind, r_ind];
-            @inbounds MatM[c_ind, r_ind] = -MatM[r_ind, c_ind];
+        for r_ind = (c_ind+1):size(MatM, 1)
+            @inbounds MatM[r_ind, c_ind] -= MatM[c_ind, r_ind]
+            @inbounds MatM[c_ind, r_ind] = -MatM[r_ind, c_ind]
         end
-        MatM[c_ind, c_ind] = 0.0;
+        MatM[c_ind, c_ind] = 0.0
     end
 
     d_ind::Int = 1
@@ -364,15 +384,15 @@ function cong_SpecOrth_Angle!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, 
         @inbounds BLAS.ger!(cos(scale * VecA[a_ind]), view(MatP, :, 2 * a_ind - 1), view(MatP, :, 2 * a_ind - 1), MatM)
         @inbounds BLAS.ger!(cos(scale * VecA[a_ind]), view(MatP, :, 2 * a_ind), view(MatP, :, 2 * a_ind), MatM)
     end
-    for d_ind in (2m + 1):size(MatM, 1)
-        @inbounds BLAS.ger!(1.0, view(MatP, :, d_ind), view(MatP, :, d_ind), MatM);
+    for d_ind in (2m+1):size(MatM, 1)
+        @inbounds BLAS.ger!(1.0, view(MatP, :, d_ind), view(MatP, :, d_ind), MatM)
     end
 end
 
-function congruenceSkewSymm!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}; transpose::Bool = false, scale::Float64 = 1.0)
-    MatM = M[];
-    MatP = P[];
-    MatS = S[];
+function congruenceSkewSymm!(M::Ref{Matrix{Float64}}, P::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}; transpose::Bool=false, scale::Float64=1.0)
+    MatM = M[]
+    MatP = P[]
+    MatS = S[]
 
     fill!(MatM, 0.0)
 
@@ -417,45 +437,45 @@ This test function verifies the congruence implementation `cong_SkewSymm_Angle` 
 θ  0.
 ```
 """
-function test_cong_SkewSymm_Angle(n = 10)
-    A = rand(div(n, 2));
-    P = rand(n, n);
-    S = rand(n, n);
-    S .-= S';
-    
-    DA = zeros(n, n);
-    DCS = zeros(n, n);
+function test_cong_SkewSymm_Angle(n=10)
+    A = rand(div(n, 2))
+    P = rand(n, n)
+    S = rand(n, n)
+    S .-= S'
+
+    DA = zeros(n, n)
+    DCS = zeros(n, n)
     for a_ind in eachindex(A)
         ang = A[a_ind]
-        DA[2 * a_ind, 2 * a_ind - 1] = ang;
-        DA[2 * a_ind - 1, 2 * a_ind] = -ang;
+        DA[2*a_ind, 2*a_ind-1] = ang
+        DA[2*a_ind-1, 2*a_ind] = -ang
 
-        DCS[2 * a_ind, 2 * a_ind - 1] = sin(ang);
-        DCS[2 * a_ind - 1, 2 * a_ind] = -sin(ang);
-        DCS[2 * a_ind - 1, 2 * a_ind - 1] = cos(ang);
-        DCS[2 * a_ind , 2 * a_ind] = cos(ang);
+        DCS[2*a_ind, 2*a_ind-1] = sin(ang)
+        DCS[2*a_ind-1, 2*a_ind] = -sin(ang)
+        DCS[2*a_ind-1, 2*a_ind-1] = cos(ang)
+        DCS[2*a_ind, 2*a_ind] = cos(ang)
     end
     if isodd(n)
-        DCS[n, n] = 1.0;
+        DCS[n, n] = 1.0
     end
 
-    congA = similar(P);
-    congruenceAngle!(Ref(congA), Ref(P), Ref(A));
-    PAPT = P * DA * P';
+    congA = similar(P)
+    congruenceAngle!(Ref(congA), Ref(P), Ref(A))
+    PAPT = P * DA * P'
 
-    congCS = similar(P);
-    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A));
-    PCSPT = P * DCS * P';
+    congCS = similar(P)
+    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A))
+    PCSPT = P * DCS * P'
 
 
     println(PAPT ≈ congA)
     println(PCSPT ≈ congCS)
 
-    congruenceAngle!(Ref(congA), Ref(P), Ref(A); transpose = true);
-    PTAP = P' * DA * P;
+    congruenceAngle!(Ref(congA), Ref(P), Ref(A); transpose=true)
+    PTAP = P' * DA * P
 
-    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A); transpose = true);
-    PTCSP = P' * DCS * P;
+    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A); transpose=true)
+    PTCSP = P' * DCS * P
 
     println(PTAP ≈ congA)
     println(PTCSP ≈ congCS)
@@ -471,42 +491,42 @@ This test function verifies the congruence implementation `cong_SpecOrth_Angle` 
 θ  0.
 ```
 """
-function test_cong_SpecOrth_Angle(n = 10)
-    A = rand(div(n, 2));
-    P = rand(n, n);
-    S = rand(n, n);
-    S .-= S';
-    
-    DCS = zeros(n, n);
+function test_cong_SpecOrth_Angle(n=10)
+    A = rand(div(n, 2))
+    P = rand(n, n)
+    S = rand(n, n)
+    S .-= S'
+
+    DCS = zeros(n, n)
     for a_ind in eachindex(A)
         ang = A[a_ind]
 
-        DCS[2 * a_ind, 2 * a_ind - 1] = sin(ang);
-        DCS[2 * a_ind - 1, 2 * a_ind] = -sin(ang);
-        DCS[2 * a_ind - 1, 2 * a_ind - 1] = cos(ang);
-        DCS[2 * a_ind , 2 * a_ind] = cos(ang);
+        DCS[2*a_ind, 2*a_ind-1] = sin(ang)
+        DCS[2*a_ind-1, 2*a_ind] = -sin(ang)
+        DCS[2*a_ind-1, 2*a_ind-1] = cos(ang)
+        DCS[2*a_ind, 2*a_ind] = cos(ang)
     end
     if isodd(n)
-        DCS[n, n] = 1.0;
+        DCS[n, n] = 1.0
     end
 
-    congA = similar(P);
-    congruenceAngle!(Ref(congA), Ref(P), Ref(A));
-    PAPT = P * DA * P';
+    congA = similar(P)
+    congruenceAngle!(Ref(congA), Ref(P), Ref(A))
+    PAPT = P * DA * P'
 
-    congCS = similar(P);
-    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A));
-    PCSPT = P * DCS * P';
+    congCS = similar(P)
+    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A))
+    PCSPT = P * DCS * P'
 
 
     println(PAPT ≈ congA)
     println(PCSPT ≈ congCS)
 
-    congruenceAngle!(Ref(congA), Ref(P), Ref(A); transpose = true);
-    PTAP = P' * DA * P;
+    congruenceAngle!(Ref(congA), Ref(P), Ref(A); transpose=true)
+    PTAP = P' * DA * P
 
-    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A); transpose = true);
-    PTCSP = P' * DCS * P;
+    congruenceCosSin!(Ref(congCS), Ref(P), Ref(A); transpose=true)
+    PTCSP = P' * DCS * P
 
     println(PTAP ≈ congA)
     println(PTCSP ≈ congCS)
@@ -514,13 +534,13 @@ function test_cong_SpecOrth_Angle(n = 10)
 end
 
 
-function test_cong_SkewSymm_dense_speed(n = 10)
-    MatP = rand(n, n);
-    MatS = rand(n, n);
-    MatS .-= MatS';
+function test_cong_SkewSymm_dense_speed(n=10)
+    MatP = rand(n, n)
+    MatS = rand(n, n)
+    MatS .-= MatS'
 
-    MatcS1 = similar(MatS);
-    MatcS2 = similar(MatS);
+    MatcS1 = similar(MatS)
+    MatcS2 = similar(MatS)
 
     P = Ref(MatP)
     S = Ref(MatS)
@@ -536,7 +556,7 @@ function test_cong_SkewSymm_dense_speed(n = 10)
     println("Dense SkewSymm congurence computation time:")
     @btime cong_SkewSymm_dense!($cS2, $P, $S)
 
-    println("Same result?\t", MatcS1 ≈ MatcS2);
+    println("Same result?\t", MatcS1 ≈ MatcS2)
 
 end
 
@@ -545,37 +565,37 @@ end
 Compare the speed of rank-1 update implementation of `cong_SkewSymm_Angle!` with the dense matrix implementation.
 ```
 """
-function test_cong_SkewSymm_Angle_speed(n = 10)
+function test_cong_SkewSymm_Angle_speed(n=10)
     # congruenceSkewSymm is bad for n > 12
-    MatP = rand(n, n);
-    VecA = rand(div(n, 2));
+    MatP = rand(n, n)
+    VecA = rand(div(n, 2))
 
     MatA = similar(MatP)
     MatM = similar(MatP)
 
-    cS1 = similar(MatP);
-    cS2 = similar(MatP);
+    cS1 = similar(MatP)
+    cS2 = similar(MatP)
 
-    A = Ref(VecA);
-    P = Ref(MatP);
-    cS = Ref(cS1);
+    A = Ref(VecA)
+    P = Ref(MatP)
+    cS = Ref(cS1)
 
 
     println("cong_SkewSymm_Angle! computation time:")
-    @time cong_SkewSymm_Angle!(cS, P, A; trans = false)
+    @time cong_SkewSymm_Angle!(cS, P, A; trans=false)
 
     println("dense matrix multiplication time:")
     @time begin
-        fill!(MatA, 0.0);
+        fill!(MatA, 0.0)
         for ind in eachindex(VecA)
-            MatA[2 * ind - 1, 2 * ind] = -VecA[ind];
-            MatA[2 * ind, 2 * ind - 1] = VecA[ind];
+            MatA[2*ind-1, 2*ind] = -VecA[ind]
+            MatA[2*ind, 2*ind-1] = VecA[ind]
         end
-        mul!(MatM, MatP, MatA);
-        mul!(cS2, MatM, MatP');
+        mul!(MatM, MatP, MatA)
+        mul!(cS2, MatM, MatP')
     end
 
-    println("Same result?\t", cS1 ≈ cS2);
+    println("Same result?\t", cS1 ≈ cS2)
 end
 
 """
@@ -583,40 +603,40 @@ end
 Compare the speed of rank-1 update implementation of `cong_SpecOrth_Angle!` with the dense matrix implementation.
 ```
 """
-function test_cong_SpecOrth_Angle_speed(n = 10)
+function test_cong_SpecOrth_Angle_speed(n=10)
     # congruenceSkewSymm is bad for n > 12
-    MatP = rand(n, n);
-    VecA = rand(div(n, 2));
+    MatP = rand(n, n)
+    VecA = rand(div(n, 2))
 
     MatA = similar(MatP)
     MatM = similar(MatP)
 
-    cS1 = similar(MatP);
-    cS2 = similar(MatP);
+    cS1 = similar(MatP)
+    cS2 = similar(MatP)
 
-    A = Ref(VecA);
-    P = Ref(MatP);
-    cS = Ref(cS1);
+    A = Ref(VecA)
+    P = Ref(MatP)
+    cS = Ref(cS1)
 
 
     println("cong_SpecOrth_Angle! computation time:")
-    @time cong_SpecOrth_Angle!(cS, P, A; trans = false)
+    @time cong_SpecOrth_Angle!(cS, P, A; trans=false)
 
     println("dense matrix multiplication time:")
     @time begin
-        fill!(MatA, 0.0);
+        fill!(MatA, 0.0)
         for ind in eachindex(VecA)
-            @inbounds MatA[2 * ind - 1, 2 * ind] = -sin(VecA[ind]);
-            @inbounds MatA[2 * ind, 2 * ind - 1] = sin(VecA[ind]);
-            @inbounds MatA[2 * ind - 1, 2 * ind - 1] = cos(VecA[ind]);
-            @inbounds MatA[2 * ind, 2 * ind] = cos(VecA[ind]);
+            @inbounds MatA[2*ind-1, 2*ind] = -sin(VecA[ind])
+            @inbounds MatA[2*ind, 2*ind-1] = sin(VecA[ind])
+            @inbounds MatA[2*ind-1, 2*ind-1] = cos(VecA[ind])
+            @inbounds MatA[2*ind, 2*ind] = cos(VecA[ind])
         end
         if isodd(n)
-            @inbounds MatA[n, n] = 1.0;
+            @inbounds MatA[n, n] = 1.0
         end
-        mul!(MatM, MatP, MatA);
-        mul!(cS2, MatM, MatP');
+        mul!(MatM, MatP, MatA)
+        mul!(cS2, MatM, MatP')
     end
 
-    println("Same result?\t", cS1 ≈ cS2);
+    println("Same result?\t", cS1 ≈ cS2)
 end

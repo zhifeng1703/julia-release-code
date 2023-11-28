@@ -49,7 +49,7 @@
 
 ########################initial guess########################
 
-function init_guess_simple(Uk)
+function stlog_init_guess_simple(Uk)
     n, k = size(Uk)
     m = n - k
     Up = zeros(n, m)
@@ -70,7 +70,7 @@ function init_guess_simple(Uk)
     return Up
 end
 
-function init_guess_complex(Uk)
+function stlog_init_guess_complex(Uk)
     n, k = size(Uk)
     S = zeros(n, n)
     S[(k+1):n, 1:k] .= Uk[(k+1):n, 1:k]
@@ -93,7 +93,7 @@ function init_guess_complex(Uk)
     return Up
 end
 
-function init_guess_grassmann(Uk)
+function stlog_init_guess_grassmann(Uk)
     n, k = size(Uk)
     factor1 = svd(Uk[1:k, :])
     factor2 = svd(Uk[(k+1):n, :])

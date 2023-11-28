@@ -7,6 +7,7 @@ include("iterator_SkewSymm.jl")
 using LoopVectorization
 
 
+
 """
     dexp_sxdx(x) -> sin(x)/x
 
@@ -85,6 +86,7 @@ mutable struct dexp_SkewSymm_system
     # Lower blocks for the system and upper blocks for the inverse system
     mat_system::Ref{Matrix{Float64}}
     mat_trasys::Ref{Matrix{Float64}}
+
     mat_dim::Int
     blk_dim::Int
     trans::Bool
@@ -255,7 +257,6 @@ _dexp_SkewSymm_core!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}, M_sys::d
 
 _dexp_SkewSymm_core_compact!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}, M_sys::dexp_SkewSymm_system, blk_it::STRICT_LOWER_ITERATOR; inv::Bool=false) = inv ? _dexp_SkewSymm_backward_compact!(Δ, S, M_sys, blk_it) : _dexp_SkewSymm_forward!(Δ, S, M_sys, blk_it);
 
-
 """
     _dexp_SkewSymm_forward!(Δ, S, M_sys; inv) -> Δ::Ref{Matrix{Float64}}
 
@@ -285,7 +286,7 @@ function _dexp_SkewSymm_forward!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64
 
 
     for c_ind = 1:blk_dim
-        @fastmath for r_ind = (c_ind+1):blk_dim
+        for r_ind = (c_ind+1):blk_dim
 
             @inbounds vS1 = MatS[2*r_ind-1, 2*c_ind-1]
             @inbounds vS2 = MatS[2*r_ind, 2*c_ind-1]
@@ -307,7 +308,7 @@ function _dexp_SkewSymm_forward!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64
 
 
     if isodd(mat_dim)
-        @fastmath for c_ind = 1:blk_dim
+        for c_ind = 1:blk_dim
             @inbounds MatΔ[mat_dim, 2*c_ind-1] = Sys[mat_dim, 2*c_ind-1] * MatS[mat_dim, 2*c_ind-1] - Sys[mat_dim, 2*c_ind] * MatS[mat_dim, 2*c_ind]
             @inbounds MatΔ[mat_dim, 2*c_ind] = Sys[mat_dim, 2*c_ind] * MatS[mat_dim, 2*c_ind-1] + Sys[mat_dim, 2*c_ind-1] * MatS[mat_dim, 2*c_ind]
         end
@@ -345,50 +346,11 @@ function _dexp_SkewSymm_forward!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64
     Vec2Lower = blk_it.vec2lower[]
     # ptrInd = pointer(Vec2Lower)
 
-    # @turbo for blk_ind in 1:blk_num
-    # @inbounds lower_ind1 = Vec2Lower[4*(blk_ind-1)+1]
-    # @inbounds lower_ind2 = Vec2Lower[4*(blk_ind-1)+2]
-    # @inbounds lower_ind3 = Vec2Lower[4*(blk_ind-1)+3]
-    # @inbounds lower_ind4 = Vec2Lower[4*(blk_ind-1)+4]
-    # end
-
-    # @turbo for blk_ind in range(1, 4 * blk_num; step=4)
-
-    #     @inbounds lower_ind1 = Vec2Lower[blk_ind]
-    #     @inbounds lower_ind2 = Vec2Lower[blk_ind+1]
-    #     @inbounds lower_ind3 = Vec2Lower[blk_ind+2]
-    #     @inbounds lower_ind4 = Vec2Lower[blk_ind+3]
-
-    #     @inbounds vS1 = MatS[lower_ind1]
-    #     @inbounds vS2 = MatS[lower_ind2]
-    #     @inbounds vS3 = MatS[lower_ind3]
-    #     @inbounds vS4 = MatS[lower_ind4]
-
-    #     @inbounds apb = Sys[lower_ind1]
-    #     @inbounds cpd = Sys[lower_ind2]
-    #     @inbounds amb = Sys[lower_ind3]
-    #     @inbounds cmd = Sys[lower_ind4]
-
-    #     @inbounds MatΔ[lower_ind1] = 0.5 * (apb * vS1 - cpd * vS2 + cmd * vS3 + amb * vS4)
-    #     @inbounds MatΔ[lower_ind2] = 0.5 * (cpd * vS1 + apb * vS2 - amb * vS3 + cmd * vS4)
-    #     @inbounds MatΔ[lower_ind3] = 0.5 * (-cmd * vS1 - amb * vS2 + apb * vS3 - cpd * vS4)
-    #     @inbounds MatΔ[lower_ind4] = 0.5 * (amb * vS1 - cmd * vS2 + cpd * vS3 + apb * vS4)
-
-    #     # @inbounds MatΔ[lower_ind1] = apb * vS1 - cpd * vS2 + cmd * vS3 + amb * vS4
-    #     # @inbounds MatΔ[lower_ind2] = cpd * vS1 + apb * vS2 - amb * vS3 + cmd * vS4
-    #     # @inbounds MatΔ[lower_ind3] = -cmd * vS1 - amb * vS2 + apb * vS3 - cpd * vS4
-    #     # @inbounds MatΔ[lower_ind4] = amb * vS1 - cmd * vS2 + cpd * vS3 + apb * vS4
-    # end
-
-    # println("Enter Forward Action Dexp_M[S] = Δ. Matrix S:")
-    # display(S[])
-
-    @turbo for blk_ind in range(1, 4 * blk_num; step=4)
-
-        @inbounds lower_ind1 = Vec2Lower[blk_ind]
-        @inbounds lower_ind2 = Vec2Lower[blk_ind+1]
-        @inbounds lower_ind3 = Vec2Lower[blk_ind+2]
-        @inbounds lower_ind4 = Vec2Lower[blk_ind+3]
+    @turbo for blk_ind in 1:blk_num
+        @inbounds lower_ind1 = Vec2Lower[4*(blk_ind-1)+1]
+        @inbounds lower_ind2 = Vec2Lower[4*(blk_ind-1)+2]
+        @inbounds lower_ind3 = Vec2Lower[4*(blk_ind-1)+3]
+        @inbounds lower_ind4 = Vec2Lower[4*(blk_ind-1)+4]
 
         @inbounds vS1 = MatS[lower_ind1]
         @inbounds vS2 = MatS[lower_ind2]
@@ -404,24 +366,16 @@ function _dexp_SkewSymm_forward!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64
         @inbounds MatΔ[lower_ind2] = 0.5 * (cpd * vS1 + apb * vS2 - amb * vS3 + cmd * vS4)
         @inbounds MatΔ[lower_ind3] = 0.5 * (-cmd * vS1 - amb * vS2 + apb * vS3 - cpd * vS4)
         @inbounds MatΔ[lower_ind4] = 0.5 * (amb * vS1 - cmd * vS2 + cpd * vS3 + apb * vS4)
-
-        # @inbounds MatΔ[lower_ind1] = apb * vS1 - cpd * vS2 + cmd * vS3 + amb * vS4
-        # @inbounds MatΔ[lower_ind2] = cpd * vS1 + apb * vS2 - amb * vS3 + cmd * vS4
-        # @inbounds MatΔ[lower_ind3] = -cmd * vS1 - amb * vS2 + apb * vS3 - cpd * vS4
-        # @inbounds MatΔ[lower_ind4] = amb * vS1 - cmd * vS2 + cpd * vS3 + apb * vS4
     end
 
     if isodd(mat_dim)
         # ptrInd = ptrInd + (4 * blk_num) * sizeof(eltype(Vec2Lower))
         ind_shift = 4 * blk_num
-        @turbo for blk_ind in range(ind_shift, ind_shift + 2 * blk_dim; step=2)
+        @turbo for blk_ind in 1:blk_dim
             # @inbounds lower_ind1 = unsafe_load(ptrInd + (2 * blk_ind - 2) * sizeof(eltype(Vec2Lower)))
             # @inbounds lower_ind2 = unsafe_load(ptrInd + (2 * blk_ind - 1) * sizeof(eltype(Vec2Lower)))
-            # @inbounds lower_ind1 = Vec2Lower[ind_shift+2*blk_ind-1]
-            # @inbounds lower_ind2 = Vec2Lower[ind_shift+2*blk_ind]
-
-            @inbounds lower_ind1 = Vec2Lower[blk_ind+1]
-            @inbounds lower_ind2 = Vec2Lower[blk_ind+2]
+            @inbounds lower_ind1 = Vec2Lower[ind_shift+2*blk_ind-1]
+            @inbounds lower_ind2 = Vec2Lower[ind_shift+2*blk_ind]
 
             @inbounds MatΔ[lower_ind1] = Sys[lower_ind1] * MatS[lower_ind1] - Sys[lower_ind2] * MatS[lower_ind2]
             @inbounds MatΔ[lower_ind2] = Sys[lower_ind2] * MatS[lower_ind1] + Sys[lower_ind1] * MatS[lower_ind2]
@@ -434,9 +388,6 @@ function _dexp_SkewSymm_forward!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64
 
         @inbounds MatΔ[d_ind+1, d_ind] = MatS[d_ind+1, d_ind]
     end
-
-    # println("Leave Forward Action Dexp_M[S] = Δ. Matrix Δ:")
-    # display(MatΔ)
 
     return Δ
 end
@@ -965,57 +916,25 @@ function dexp_SkewSymm!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}, M_sys
     # MatTemp2 = wsp_cong[2];
 
 
-
     if cong
-        # if inv
-        #     println("\nEnter Backward Action Dexp_M^{-1}[Δ] = S. Input Matrix Δ:\n")
-        #     display(S[])
-        # else
-        #     println("\nEnter Forward Action Dexp_M[S] = Δ. Input Matrix S:\n")
-        #     display(S[])
-        # end
         cong_dense!(Δ, M_saf.vector, S, wsp_cong; trans=true)
         fill_upper_SkewSymm!(Δ)
-
-        # if inv
-        #     println("\nConverted Input Matrix P^TΔP:\n")
-        #     display(Δ[])
-        # else
-        #     println("\nConvert Input Matrix P^TSP:\n")
-        #     display(Δ[])
-        # end
-
         # @inbounds mul!(MatΔ, MatP', MatS)
         # @inbounds mul!(MatTmp, MatΔ, MatP)
         _dexp_SkewSymm_core!(Tmp, Δ, M_sys; inv=inv)
         fill_upper_SkewSymm!(Tmp)
 
-        # if inv
-        #     println("\nConverted OutPut Matrix P^TSP:\n")
-        #     display(Tmp[])
-        # else
-        #     println("\nConvert OutPut Matrix P^TΔP:\n")
-        #     display(Tmp[])
-        # end
-
         unsafe_copyto!(pointer(MatΔ), pointer(MatTmp), length(MatΔ))
         cong_dense!(Δ, M_saf.vector, Δ; trans=false)
         fill_upper_SkewSymm!(Δ)
 
-        # if inv
-        #     println("\nLeave Backward Action Dexp_M^{-1}[Δ] = S. Output Matrix S:\n")
-        #     display(Δ[])
-        # else
-        #     println("\nLeave Forward Action Dexp_M[S] = Δ. Output Matrix Δ:\n")
-        #     display(Δ[])
-        # end
+        # @inbounds mul!(MatTemp2, MatP, MatΔ)
+        # @inbounds mul!(MatΔ, MatTemp2, MatP')
     else
         _dexp_SkewSymm_core!(Δ, S, M_sys; inv=inv)
         fill_upper_SkewSymm!(Δ)
     end
 end
-
-
 
 function dexp_SkewSymm!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}, M_sys::dexp_SkewSymm_system, M_saf::SAFactor, blk_it::STRICT_LOWER_ITERATOR, wsp_cong::WSP; inv::Bool=false, cong::Bool=true, compact::Bool=false)
     MatS = S[]
@@ -1028,83 +947,35 @@ function dexp_SkewSymm!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}, M_sys
 
 
     if cong
-        # if inv
-        #     println("\nEnter Backward Action Dexp_M^{-1}[Δ] = S. Input Matrix Δ:\n")
-        #     display(S[])
-        # else
-        #     println("\nEnter Forward Action Dexp_M[S] = Δ. Input Matrix S:\n")
-        #     display(S[])
-        # end
-
         cong_dense!(Δ, M_saf.vector, S, wsp_cong; trans=true)
-        # fill_upper_SkewSymm!(Δ, blk_it)
-        fill_upper_SkewSymm!(Δ)
+        fill_upper_SkewSymm!(Δ, blk_it)
         # @inbounds mul!(MatΔ, MatP', MatS)
         # @inbounds mul!(MatTmp, MatΔ, MatP)
-
-        # if inv
-        #     println("\nConverted Input Matrix P^TΔP:\n")
-        #     display(Δ[])
-        # else
-        #     println("\nConvert Input Matrix P^TSP:\n")
-        #     display(Δ[])
-        # end
-
         if compact
             _dexp_SkewSymm_core_compact!(Tmp, Δ, M_sys, blk_it; inv=inv)
         else
             _dexp_SkewSymm_core!(Tmp, Δ, M_sys, blk_it; inv=inv)
         end
-        # fill_upper_SkewSymm!(Tmp, blk_it)
-        fill_upper_SkewSymm!(Tmp)
-
-
-        # if inv
-        #     println("\nConverted OutPut Matrix P^TSP:\n")
-        #     display(Tmp[])
-        # else
-        #     println("\nConvert OutPut Matrix P^TΔP:\n")
-        #     display(Tmp[])
-        # end
+        fill_upper_SkewSymm!(Tmp, blk_it)
 
         unsafe_copyto!(pointer(MatΔ), pointer(MatTmp), length(MatΔ))
-        cong_dense!(Δ, M_saf.vector, Δ, wsp_cong; trans=false)
-        # fill_upper_SkewSymm!(Δ, blk_it)
-        fill_upper_SkewSymm!(Δ)
-
-
-        # if inv
-        #     println("\nLeave Backward Action Dexp_M^{-1}[Δ] = S. Output Matrix S:\n")
-        #     display(Δ[])
-        # else
-        #     println("\nLeave Forward Action Dexp_M[S] = Δ. Output Matrix Δ:\n")
-        #     display(Δ[])
-        # end
+        cong_dense!(Δ, M_saf.vector, Δ; trans=false)
+        fill_upper_SkewSymm!(Δ, blk_it)
 
         # @inbounds mul!(MatTemp2, MatP, MatΔ)
         # @inbounds mul!(MatΔ, MatTemp2, MatP')
     else
         if compact
-            _dexp_SkewSymm_core_compact!(Δ, S, M_sys, blk_it; inv=inv)
+            _dexp_SkewSymm_core_compact!(Tmp, S, M_sys, blk_it; inv=inv)
         else
-            _dexp_SkewSymm_core!(Δ, S, M_sys, blk_it; inv=inv)
+            _dexp_SkewSymm_core!(Tmp, S, M_sys, blk_it; inv=inv)
         end
-        # fill_upper_SkewSymm!(Δ, blk_it)
-        fill_upper_SkewSymm!(Δ)
+        fill_upper_SkewSymm!(Tmp, blk_it)
 
-
-        # unsafe_copyto!(pointer(MatΔ), pointer(MatTmp), length(MatΔ))
+        unsafe_copyto!(pointer(MatΔ), pointer(MatTmp), length(MatΔ))
 
     end
 end
-
-
-dexp_SkewSymm!(S::Ref{Matrix{Float64}}, M_sys::dexp_SkewSymm_system, M_saf::SAFactor, wsp_cong::WSP=get_wsp_cong(size(S[], 1)); inv::Bool=false, cong::Bool=true) =
-    dexp_SkewSymm!(S, S, M_sys, M_saf, wsp_cong; inv=inv, cong=cong)
-
-dexp_SkewSymm!(S::Ref{Matrix{Float64}}, M_sys::dexp_SkewSymm_system, M_saf::SAFactor, blk_it::STRICT_LOWER_ITERATOR, wsp_cong::WSP=get_wsp_cong(size(S[], 1)); inv::Bool=false, cong::Bool=true, compact::Bool=false) =
-    dexp_SkewSymm!(S, S, M_sys, M_saf, wsp_cong; inv=inv, cong=cong, compact=compact)
-
 
 function dexp_SkewSymm_thread!(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}, M_sys::dexp_SkewSymm_system, M_saf::SAFactor, blk_it::STRICT_LOWER_ITERATOR, wsp_cong::WSP; inv::Bool=false, cong::Bool=true, compact::Bool=false)
     MatS = S[]
@@ -1148,422 +1019,134 @@ end
 
 #######################################Test functions#######################################
 
-using Plots, Printf
+using Plots
 
 include("real_dexp_st.jl")
-include(joinpath(JULIA_ROUTINE_PATH, "dexp_SemiSimple.jl"))
-include(joinpath(JULIA_ROUTINE_PATH, "dexp_ScaleSquare.jl"))
 
 
 
+function dexp_complex(Δ::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}, M::Ref{Matrix{Float64}}, H::Ref{Matrix{ComplexF64}}, wsp_comp::WSP)
+    MatM = M[]
+    MatΔ = Δ[]
+    MatS = S[]
+    MatH = H[]
 
+    M_eigen = eigen(MatM)
+    M_vec = M_eigen.vectors
+    M_ang = M_eigen.values
 
-function test_dexp_SkewSymm_Normal(n; seed=9527)
-    eng = MersenneTwister(seed)
+    Temp1 = wsp_comp[1]
+    Temp2 = wsp_comp[2]
 
-    S = rand(eng, n, n)
-    S .-= S'
+    mul!(Temp1, M_vec', MatS)
+    mul!(Temp2, Temp1, M_vec)
 
-    D_real = rand(eng, n, n)
-    D_real .-= D_real'
 
-    D_complex = zeros(ComplexF64, n, n)
-    D_complex .= D_real
-
-    blk_it = STRICT_LOWER_ITERATOR(n, lower_blk_traversal)
-    S_saf = SAFactor(n)
-    schurAngular_SkewSymm!(S_saf, Ref(S), get_wsp_saf(n))
-    sys_SkewSymm = dexp_SkewSymm_system(n)
-    compute_dexp_SkewSymm_both_system!(sys_SkewSymm, S_saf.angle)
-    wsp_SkewSymm = get_wsp_cong(n)
-
-
-    S_eig = eigen(S)
-    sys_SemiSimple = dexp_SemiSimple_system(n)
-    compute_dexp_Normal_system!(sys_SemiSimple, S_eig)
-    wsp_SemiSimple = WSP(Matrix{ComplexF64}(undef, n, n))
-
-    Δ_real = zeros(n, n)
-    Δ_complex = zeros(ComplexF64, n, n)
-    Δ_complex_skewsymm = zeros(n, n)
-
-    Q = exp(S)
-
-
-    sample_num = 100
-    record = zeros(sample_num, 4)
-
-    M = sys_SemiSimple.mat_inv_vect[] * D_complex * sys_SemiSimple.mat_eig_vect[]
-    # display(M)
-    # Phi = [S_eig.values[r_ind] ≈ S_eig.values[c_ind] ? exp(S_eig.values[r_ind]) : (exp(S_eig.values[r_ind]) - exp(S_eig.values[c_ind])) / (S_eig.values[r_ind] - S_eig.values[c_ind]) for r_ind = 1:n, c_ind = 1:n]
-
-    # display(M .* Phi)
-    # display(sys_SemiSimple.mat_eig_vect[] * (M .* Phi) * sys_SemiSimple.mat_inv_vect[])
-
-    # display(sys_SemiSimple.mat_psi_comp[])
-
-
-    for s_ind in 1:sample_num
-
-
-        stat = @timed dexp_SkewSymm!(Ref(Δ_real), Ref(D_real), sys_SkewSymm, S_saf, blk_it, wsp_SkewSymm; cong=false)
-        record[s_ind, 1] = (stat.time - stat.gctime) * 1000
-
-        stat = @timed dexp_SkewSymm!(Ref(Δ_real), Ref(D_real), sys_SkewSymm, S_saf, blk_it, wsp_SkewSymm; cong=true)
-        record[s_ind, 2] = (stat.time - stat.gctime) * 1000
-
-        stat = @timed dexp_SemiSimple!(Ref(Δ_complex), Ref(D_complex), sys_SemiSimple, wsp_SemiSimple; simi=false)
-        record[s_ind, 3] = (stat.time - stat.gctime) * 1000
-
-        stat = @timed begin
-            dexp_SemiSimple!(Ref(Δ_complex), Ref(D_complex), sys_SemiSimple, wsp_SemiSimple; simi=true)
-            # mul!(Δ_complex_skewsymm, Q', real.(Δ_complex))
-        end
-        record[s_ind, 4] = (stat.time - stat.gctime) * 1000
-    end
-
-    println("Same result?\t", exp(S) * Δ_real ≈ real.(Δ_complex))
-
-    # display(Δ_real)
-    # display(Δ_complex)
-
-
-    @printf "Methods\t\t\t|\t Min time \t|\t Avg Time \t|\t Max Time \t|\n"
-    methods = ["dexp_SkewSymm, Core", "dexp_SkewSymm, Full", "dexp_SemiSimple, Core", "dexp_SemiSimple, Full"]
-
-    for ind = 1:4
-        @printf "%s\t|\t%.8f\t|\t%.8f\t|\t%.8f\t|\n" methods[ind] minimum(record[:, ind]) mean(record[:, ind]) maximum(record[:, ind])
-    end
-
-end
-
-function test_dexp_SkewSymm(n::Int; seed=9527, loop=1000, cong=true, print=false)
-    eng = MersenneTwister(seed)
-
-    MatM = rand(eng, n, n)
-    MatM .-= MatM'
-
-
-    MatS_r = rand(eng, n, n)
-    MatS_r .-= MatS_r'
-    MatS_c = zeros(ComplexF64, n, n)
-    MatS_c .= MatS_r
-    MatS_s = copy(MatS_r)
-
-    MatΔ_r = zeros(n, n)
-    MatΔ_c = zeros(ComplexF64, n, n)
-    MatΔ_s = zeros(n, n)
-
-
-    blk_it = STRICT_LOWER_ITERATOR(n, lower_blk_traversal)
-    M_saf = SAFactor(n)
-    schurAngular_SkewSymm!(M_saf, Ref(MatM), get_wsp_saf(n))
-    M_sys = dexp_SkewSymm_system(n)
-    compute_dexp_SkewSymm_both_system!(M_sys, M_saf.angle)
-    wsp_cong_n = get_wsp_cong(n)
-
-    M_eig = eigen(MatM)
-    M_sys_SemiSimple = dexp_SemiSimple_system(n)
-    compute_dexp_Normal_system!(M_sys_SemiSimple, M_eig)
-    wsp_SemiSimple_n = WSP(Matrix{ComplexF64}(undef, n, n))
-
-    M_sys_ScaleSquare = dexp_ScaleSquare_system(n)
-    compute_dexp_ScaleSquare_system!(M_sys_ScaleSquare, Ref(MatM))
-    wsp_ScaleSquare_n = get_wsp_dexp_ScaleSquare(n)
-
-    # MatQ = exp(MatM)
-
-    record = zeros(4, loop)
-    # MatM_c = M_sys_SemiSimple.mat_inv_vect[] * MatS_c * M_sys_SemiSimple.mat_eig_vect[]
-
-    S_r = Ref(MatS_r)
-    S_c = Ref(MatS_c)
-    S_s = Ref(MatS_s)
-
-
-    Δ_r = Ref(MatΔ_r)
-    Δ_c = Ref(MatΔ_c)
-    Δ_s = Ref(MatΔ_s)
-
-
-    MateM = zeros(n, n)
-    M = Ref(MatM)
-    eM = Ref(MateM)
-
-
-    for s_ind in 1:loop
-
-        # stat = @timed dexp_SemiSimple!(Δ_c, S_c, M_sys_SemiSimple, wsp_SemiSimple_n; simi=cong)
-
-        stat = @timed dexp_ScaleSquare!(eM, Δ_s, M, M_sys_ScaleSquare, S_s, wsp_ScaleSquare_n)
-        record[1, s_ind] = (stat.time - stat.gctime) * 1e3
-
-        stat = @timed dexp_SemiSimple!(Δ_c, S_c, M_sys_SemiSimple, wsp_SemiSimple_n; simi=cong)
-        record[2, s_ind] = (stat.time - stat.gctime) * 1e3
-
-        stat = @timed dexp_SkewSymm!(Δ_r, S_r, M_sys, M_saf, wsp_cong_n; cong=cong)
-        record[3, s_ind] = (stat.time - stat.gctime) * 1e3
-
-        stat = @timed dexp_SkewSymm!(Δ_r, S_r, M_sys, M_saf, blk_it, wsp_cong_n; cong=cong)
-        record[4, s_ind] = (stat.time - stat.gctime) * 1e3
-    end
-
-    # println("Same result?\t", exp(S) * Δ_real ≈ real.(Δ_complex))
-
-    method_str = (b) -> b ? "(Full)" : "(Core)"
-
-    if print
-        @printf "+-----------------------------------------------------------------------------------------------+\n"
-        @printf "|Dexp_S[Δ]\t\t|Min. Time\t|Avg. Time\t|Max. Time\t| (Over %i attempt)\t|\n" loop
-        @printf "+-----------------------------------------------------------------------------------------------+\n"
-        @printf "|ScaleSquare %s\t|%.8f\t|%.8f\t|%.8f\t| (micro second)\t|\n" method_str(cong) minimum(record[1, :]) mean(record[1, :]) maximum(record[1, :])
-        @printf "|SemiSimple  %s\t|%.8f\t|%.8f\t|%.8f\t| (micro second)\t|\n" method_str(cong) minimum(record[2, :]) mean(record[2, :]) maximum(record[2, :])
-        @printf "|Skew Raw    %s\t|%.8f\t|%.8f\t|%.8f\t| (micro second)\t|\n" method_str(cong) minimum(record[3, :]) mean(record[3, :]) maximum(record[3, :])
-        @printf "|Skew Iter.  %s\t|%.8f\t|%.8f\t|%.8f\t| (micro second)\t|\n" method_str(cong) minimum(record[4, :]) mean(record[4, :]) maximum(record[4, :])
-        @printf "+-----------------------------------------------------------------------------------------------+\n\n"
-    end
-
-    return record
-
-    # @printf "Methods\t\t\t|\t Min time \t|\t Avg Time \t|\t Max Time \t|\n"
-    # methods = ["dexp_SkewSymm, Core", "dexp_SkewSymm, Full", "dexp_SemiSimple, Core", "dexp_SemiSimple, Full"]
-
-    # for ind = 1:4
-    #     @printf "%s\t|\t%.8f\t|\t%.8f\t|\t%.8f\t|\n" methods[ind] minimum(record[:, ind]) mean(record[:, ind]) maximum(record[:, ind])
-    # end
-
-end
-
-function test_dexp_SkewSymm(dims::Vector{Int}; seed=9527, loop=1000, cong=true, print=false, savefigure=false)
-    eng = MersenneTwister(seed)
-
-    record = zeros(length(dims), 5, loop)
-
-    method_str = (b) -> b ? "(Full)" : "(Core)"
-
-
-
-    for d_ind in eachindex(dims)
-        n = dims[d_ind]
-
-        MatM = rand(eng, n, n)
-        MatM .-= MatM'
-
-        MatS_r = rand(eng, n, n)
-        MatS_r .-= MatS_r'
-        MatS_c = zeros(ComplexF64, n, n)
-        MatS_c .= MatS_r
-        MatS_s = copy(MatS_r)
-
-        MatΔ_r = zeros(n, n)
-        MatΔ_c = zeros(ComplexF64, n, n)
-        MatΔ_s = copy(MatΔ_r)
-
-
-        blk_it = STRICT_LOWER_ITERATOR(n, lower_blk_traversal)
-        M_saf = SAFactor(n)
-        schurAngular_SkewSymm!(M_saf, Ref(MatM), get_wsp_saf(n))
-        M_sys = dexp_SkewSymm_system(n)
-        compute_dexp_SkewSymm_both_system!(M_sys, M_saf.angle)
-        wsp_cong_n = get_wsp_cong(n)
-
-        M_eig = eigen(MatM)
-        M_sys_SemiSimple = dexp_SemiSimple_system(n)
-        compute_dexp_Normal_system!(M_sys_SemiSimple, M_eig)
-        wsp_SemiSimple_n = WSP(Matrix{ComplexF64}(undef, n, n))
-
-        M_sys_ScaleSquare = dexp_ScaleSquare_system(n)
-        compute_dexp_ScaleSquare_system!(M_sys_ScaleSquare, Ref(MatM))
-        wsp_ScaleSquare_n = get_wsp_dexp_ScaleSquare(n)
-
-        # MatQ = exp(MatM)
-        # MatM_c = M_sys_SemiSimple.mat_inv_vect[] * MatS_c * M_sys_SemiSimple.mat_eig_vect[]
-
-        S_r = Ref(MatS_r)
-        S_c = Ref(MatS_c)
-        S_s = Ref(MatS_s)
-
-        Δ_r = Ref(MatΔ_r)
-        Δ_c = Ref(MatΔ_c)
-        Δ_s = Ref(MatΔ_s)
-
-        MateM = zeros(n, n)
-        eM = Ref(MateM)
-        M = Ref(MatM)
-
-
-        for s_ind in 1:loop
-
-            stat = @timed dexp_ScaleSquare!(eM, Δ_s, M, M_sys_ScaleSquare, S_s, wsp_ScaleSquare_n)
-            record[d_ind, 1, s_ind] = (stat.time - stat.gctime) * 1e3
-
-            stat = @timed dexp_SemiSimple!(Δ_c, S_c, M_sys_SemiSimple, wsp_SemiSimple_n; simi=cong)
-            record[d_ind, 2, s_ind] = (stat.time - stat.gctime) * 1e3
-
-            # stat = @timed dexp_SkewSymm!(Δ_r, S_r, M_sys, M_saf, wsp_cong_n; cong=cong)
-            # record[d_ind, 2, s_ind] = (stat.time - stat.gctime) * 1e3
-
-            stat = @timed dexp_SkewSymm!(Δ_r, S_r, M_sys, M_saf, blk_it, wsp_cong_n; cong=cong)
-            record[d_ind, 3, s_ind] = (stat.time - stat.gctime) * 1e3
-
-            stat = @timed dexp_SemiSimple!(Δ_c, S_c, M_sys_SemiSimple, wsp_SemiSimple_n; simi=cong, inv=true)
-            record[d_ind, 4, s_ind] = (stat.time - stat.gctime) * 1e3
-
-            stat = @timed dexp_SkewSymm!(Δ_r, S_r, M_sys, M_saf, blk_it, wsp_cong_n; cong=cong, inv=true)
-            record[d_ind, 5, s_ind] = (stat.time - stat.gctime) * 1e3
-        end
-
-        if print
-            @printf "+-----------------------------------------------------------------------------------------------+\n"
-            @printf "|Dexp_S[Δ], n = %i \t\t|Min. Time\t|Avg. Time\t|Max. Time\t| (Over %i attempt)\t|\n" n loop
-            @printf "+-----------------------------------------------------------------------------------------------+\n"
-            @printf "|ScaleSquare %s\t|%.8f\t|%.8f\t|%.8f\t| (micro second)\t|\n" method_str(cong) minimum(record[d_ind, 1, :]) mean(record[d_ind, 1, :]) maximum(record[d_ind, 1, :])
-            @printf "|SemiSimple  %s\t|%.8f\t|%.8f\t|%.8f\t| (micro second)\t|\n" method_str(cong) minimum(record[d_ind, 2, :]) mean(record[d_ind, 2, :]) maximum(record[d_ind, 2, :])
-            @printf "|Skew Iter.  %s\t|%.8f\t|%.8f\t|%.8f\t| (micro second)\t|\n" method_str(cong) minimum(record[d_ind, 3, :]) mean(record[d_ind, 3, :]) maximum(record[d_ind, 3, :])
-            @printf "+-----------------------------------------------------------------------------------------------+\n"
-            @printf "|Dexp_S^{-1}[Δ], n = %i \t|Min. Time\t|Avg. Time\t|Max. Time\t| (Over %i attempt)\t|\n" n loop
-            @printf "+-----------------------------------------------------------------------------------------------+\n"
-            @printf "|SemiSimple  %s\t|%.8f\t|%.8f\t|%.8f\t| (micro second)\t|\n" method_str(cong) minimum(record[d_ind, 4, :]) mean(record[d_ind, 4, :]) maximum(record[d_ind, 2, :])
-            @printf "|Skew Iter.  %s\t|%.8f\t|%.8f\t|%.8f\t| (micro second)\t|\n" method_str(cong) minimum(record[d_ind, 5, :]) mean(record[d_ind, 5, :]) maximum(record[d_ind, 3, :])
-            @printf "+-----------------------------------------------------------------------------------------------+\n\n"
+    for c_ind in axes(H, 2)
+        for r_ind in axes(H, 1)
+            @inbounds MatH[r_ind, c_ind] = norm(M_ang[c_ind] - M_ang[r_ind]) < 1e-15 ? 1.0 : (exp(M_ang[c_ind] - M_ang[r_ind]) - 1) / (M_ang[c_ind] - M_ang[r_ind])
+            @inbounds Temp1[r_ind, c_ind] = MatH[r_ind, c_ind] * Temp2[r_ind, c_ind]
         end
     end
 
-    # println("Same result?\t", exp(S) * Δ_real ≈ real.(Δ_complex))
+    mul!(Temp2, M_vec, Temp1)
+    mul!(Temp1, Temp2, M_vec')
 
-    record_maximum = maximum(record, dims=3)
-    record_minimum = minimum(record, dims=3)
-    record_mean = mean(record, dims=3)
-
-    # figure()
-    # p1 = plot(dims, record_mean[:, 1, :], label="ScaleSquare, Avg. time", xlabel="n, dimension", ylabel="Time (ms)")
-    # plot!(dims, record_mean[:, 2, :], label="SemiSimple., Avg. time")
-    # plot!(dims, record_mean[:, 3, :], label="SkewSymm., Avg. time")
-
-
-    # p2 = plot(dims, record_mean[:, 1, :], label="ScaleSquare, Avg. time", yscale=:log2, xlabel="n, dimension", ylabel="Time (ms)")
-    # plot!(dims, record_mean[:, 2, :], label="SemiSimple., Avg. time", yscale=:log2, xscale=:log2)
-    # plot!(dims, record_mean[:, 3, :], label="SkewSymm., Avg. time", yscale=:log2, xscale=:log2)
-
-
-    p1 = plot(dims, record_minimum[:, 2, :], label="Dexp, SemiSimple", xlabel="n, dimension", ylabel="Time (ms)")
-    plot!(dims, record_minimum[:, 3, :], label="Dexp, SkewSymm.")
-    plot!(dims, record_minimum[:, 1, :], label="Dexp, General")
-
-
-    p2 = plot(dims, record_minimum[:, 2, :], label="Dexp, Semisimple", yscale=:log2, xscale=:log2, xlabel="n, dimension", ylabel="Time (ms)")
-
-    plot!(dims, record_minimum[:, 3, :], label="Dexp, SkewSymm.", yscale=:log2, xscale=:log2)
-    plot!(dims, record_minimum[:, 1, :], label="Dexp, General", yscale=:log2, xscale=:log2)
-
-    p3 = plot(dims, record_minimum[:, 4, :], label="Dexp^{-1}, SemiSimple", xlabel="n, dimension", ylabel="Time (ms)")
-    plot!(dims, record_minimum[:, 5, :], label="Dexp^{-1}, SkewSymm.")
-
-
-    p4 = plot(dims, record_minimum[:, 1, :], label="Dexp^{-1}, SemiSimple", yscale=:log2, xscale=:log2, xlabel="n, dimension", ylabel="Time (ms)")
-    plot!(dims, record_minimum[:, 2, :], label="Dexp^{-1}, SkewSymm.", yscale=:log2, xscale=:log2)
-
-    plt = plot(p1, p2, p3, p4, layout=[2, 2], figsize=(1000, 1000))
-
-    display(plt)
-
-    # return record
-
-    # @printf "Methods\t\t\t|\t Min time \t|\t Avg Time \t|\t Max Time \t|\n"
-    # methods = ["dexp_SkewSymm, Core", "dexp_SkewSymm, Full", "dexp_SemiSimple, Core", "dexp_SemiSimple, Full"]
-
-    # for ind = 1:4
-    #     @printf "%s\t|\t%.8f\t|\t%.8f\t|\t%.8f\t|\n" methods[ind] minimum(record[:, ind]) mean(record[:, ind]) maximum(record[:, ind])
-    # end
-
-    println("Random seed:\t $(seed)")
-
-    if savefigure
-        savefig(plt, "figures/dexp_speed_seed_$(seed).pdf")
+    for c_ind in axes(MatΔ, 2)
+        for r_ind in axes(MatΔ, 1)
+            @inbounds MatΔ[r_ind, c_ind] = Temp1[r_ind, c_ind].re
+        end
     end
 
+    return Δ
 end
 
-function test_dexp_SkewSymm_Error(n::Int; seed=9527, loop=1000, cong=true, print=false)
-    eng = MersenneTwister(seed)
+dexp_complex_para(a::ComplexF64, b::ComplexF64) = norm(a - b) < 1e-15 ? 1.0 : (exp(a - b) - 1) / (a - b);
 
-    record = zeros(4, loop)
+function dexp_complex_para(H::Ref{Matrix{ComplexF64}}, A::Ref{Vector{ComplexF64}})
+    MatH = H[]
+    VecA = A[]
+    @tturbo warn_check_args = false for c_ind in eachindex(VecA)
+        for r_ind in eachindex(VecA)
+            @inbounds MatH[r_ind, c_ind] = dexp_complex_para(VecA[c_ind], VecA[r_ind])
+        end
+    end
+end
 
-    method_str = (b) -> b ? "(Full)" : "(Core)"
+function dexp_complex_para_thread(H::Ref{Matrix{ComplexF64}}, A::Ref{Vector{ComplexF64}})
+    MatH = H[]
+    VecA = A[]
 
-    MatM = zeros(n, n)
-    MatS = zeros(n, n)
+    leading_dim = size(MatH, 1)
 
+    @tturbo for ind in eachindex(MatH)
+        r_ind, c_ind = vec2mat_ind(leading_dim, ind)
+        @inbounds MatH[ind] = dexp_complex_para(VecA[c_ind], VecA[r_ind])
+    end
+end
 
-    MatS_r = zeros(n, n)
-    MatS_c = zeros(ComplexF64, n, n)
-    MatΔ_r = zeros(n, n)
-    MatΔ_c = zeros(ComplexF64, n, n)
-
-    M = Ref(MatM)
-    S = Ref(MatS)
-    S_r = Ref(MatS_r)
-    S_c = Ref(MatS_c)
-    Δ_r = Ref(MatΔ_r)
-    Δ_c = Ref(MatΔ_c)
-
-    blk_it = STRICT_LOWER_ITERATOR(n, lower_blk_traversal)
-    M_saf = SAFactor(n)
-    M_sys = dexp_SkewSymm_system(n)
-    M_sys_SemiSimple = dexp_SemiSimple_system(n)
-
-    wsp_cong_n = get_wsp_cong(n)
-    wsp_SemiSimple_n = WSP(Matrix{ComplexF64}(undef, n, n))
-
-
-    for ind = 1:loop
-
-        MatM .= rand(eng, n, n)
-        MatM .-= MatM'
-
-        MatS .= rand(eng, n, n)
-        MatS .-= MatS'
-
-        MatS_r .= MatS
-        MatS_c .= MatS
-
-        MatΔ_r .= 0.0
-        MatΔ_c .= 0.0
-
-        schurAngular_SkewSymm!(M_saf, M, get_wsp_saf(n))
-        compute_dexp_SkewSymm_both_system!(M_sys, M_saf.angle)
-
-        M_eig = eigen(MatM)
-        compute_dexp_Normal_system!(M_sys_SemiSimple, M_eig)
+function dexp_complex_action(M::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}, H::Ref{Matrix{ComplexF64}}, P::Ref{Matrix{ComplexF64}}, wsp_comp::WSP)
+    MatM = M[]
+    MatS = S[]
+    MatH = H[]
+    MatP = P[]
 
 
-        dexp_SemiSimple!(Δ_c, S_c, M_sys_SemiSimple, wsp_SemiSimple_n; simi=cong)
-        dexp_SemiSimple!(S_c, Δ_c, M_sys_SemiSimple, wsp_SemiSimple_n; inv=true, simi=cong)
+    Temp1 = wsp_comp[1]
+    Temp2 = wsp_comp[2]
 
-        record[1, ind] = norm(real.(MatS_c) .- MatS)
-        record[2, ind] = record[1, ind] / norm(MatS)
-
-
-        # stat = @timed dexp_SkewSymm!(Δ_r, S_r, M_sys, M_saf, wsp_cong_n; cong=cong)
-        # record[d_ind, 2, s_ind] = (stat.time - stat.gctime) * 1e3
-
-        dexp_SkewSymm!(Δ_r, S_r, M_sys, M_saf, blk_it, wsp_cong_n; cong=cong)
-        dexp_SkewSymm!(S_r, Δ_r, M_sys, M_saf, blk_it, wsp_cong_n; inv=true, cong=cong)
-
-        # display(real.(MatS_c) .- MatS_r)
+    mul!(Temp1, MatP', MatS)
+    mul!(Temp2, Temp1, MatP)
 
 
-        record[3, ind] = norm(MatS_r .- MatS)
-        record[4, ind] = record[3, ind] / norm(MatS)
+    @inbounds @simd for ind in eachindex(MatH)
+        @inbounds Temp1[ind] = MatH[ind] * Temp2[ind]
     end
 
-    if print
-        @printf "+-----------------------------------------------------------------------------------------------+\n"
-        @printf "|S = Dexp_M^{-1}[Dexp_M[S]]\t|Min. AbsErr\t|Min. RelErr\t|Avg. AbsErr\t|Avg. RelErr\t|Max. AbsErr\t|Max. RelErr\t| (Over %i attempt)\t|\n" loop
-        @printf "+-----------------------------------------------------------------------------------------------+\n"
-        @printf "|SemiSimple \t\t\t|%.12f\t|%.12f\t|%.12f\t|%.12f\t|%.12f\t|%.12f\t|\n" minimum(record[1, :]) minimum(record[2, :]) mean(record[1, :]) mean(record[2, :]) maximum(record[1, :]) maximum(record[2, :])
-        @printf "|SkewSymm \t\t\t|%.12f\t|%.12f\t|%.12f\t|%.12f\t|%.12f\t|%.12f\t|\n" minimum(record[3, :]) minimum(record[4, :]) mean(record[3, :]) mean(record[4, :]) maximum(record[3, :]) maximum(record[4, :])
-        @printf "+-----------------------------------------------------------------------------------------------+\n\n"
+    mul!(Temp2, MatP, Temp1)
+    mul!(Temp1, Temp2, MatP')
+
+    @inbounds @simd for ind in eachindex(MatM)
+        @inbounds MatM[ind] = real(Temp1[ind])
+    end
+end
+
+function _dexp_complex_action_core(M::Ref{Matrix{ComplexF64}}, S::Ref{Matrix{ComplexF64}}, H::Ref{Matrix{ComplexF64}})
+    MatM = M[]
+    MatS = S[]
+    MatH = H[]
+
+    @inbounds @simd for ind in eachindex(MatH)
+        @inbounds MatM[ind] = MatH[ind] * MatS[ind]
+    end
+end
+
+function dexp_complex_action_thread(M::Ref{Matrix{Float64}}, S::Ref{Matrix{Float64}}, H::Ref{Matrix{ComplexF64}}, P::Ref{Matrix{ComplexF64}}, wsp_comp::WSP)
+    MatM = M[]
+    MatS = S[]
+    MatH = H[]
+    MatP = P[]
+
+
+    Temp1 = wsp_comp[1]
+    Temp2 = wsp_comp[2]
+    TempR = wsp_comp[3]
+    TempI = wsp_comp[4]
+
+
+    mul!(Temp1, MatP', MatS)
+    mul!(Temp2, Temp1, MatP)
+
+
+    @tturbo warn_check_args = false for ind in eachindex(MatH)
+        @inbounds Temp1[ind] = MatH[ind] * Temp2[ind]
+    end
+
+    mul!(Temp2, MatP, Temp1)
+    mul!(Temp1, Temp2, MatP')
+
+    @tturbo warn_check_args = false for ind in eachindex(MatM)
+        @inbounds MatM[ind] = real(Temp1[ind])
     end
 end
 
