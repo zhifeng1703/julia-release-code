@@ -671,7 +671,8 @@ function test_stlog_solver(n, k; seed=9527, MaxIter=200, MaxTime=10, AbsTol=1e-9
 end
 
 
-function test_stlog_profile(n::Int, k::Int, σ; seed=9527, MaxIter=200, MaxTime=10, AbsTol=1e-12, loops=10)
+function test_stlog_profile(n::Int, k::Int, σ; seed=9527, MaxIter=200, MaxTime=10, AbsTol=1e-12, loops=10, Solver_Stop=terminator(500, Int(round(1e6)), 1e-10, 1e-8), NMLS_Set=NMLS_Paras(0.2, 20.0, 0.9, 0.3, 0)
+)
     eng = MersenneTwister(seed)
     num_alg = 6
     Record = zeros(Int, length(σ), num_alg, loops)
@@ -686,6 +687,7 @@ function test_stlog_profile(n::Int, k::Int, σ; seed=9527, MaxIter=200, MaxTime=
 
 
 
+
     MatS = rand(eng, n, n)
     fill!(view(MatS, (k+1):n, (k+1):n), 0.0)
     MatS .-= MatS'
@@ -696,9 +698,6 @@ function test_stlog_profile(n::Int, k::Int, σ; seed=9527, MaxIter=200, MaxTime=
 
 
     Stop = terminator(MaxIter, Int(round(MaxTime * 1e9)), AbsTol, AbsTol)
-    Solver_Stop = terminator(500, Int(round(1e6)), 1e-12, 1e-6)
-
-    NMLS_Set = NMLS_Paras(0.5, 20.0, 0.9, 0.3, 0)
 
 
     for s_ind in eachindex(σ)
@@ -744,38 +743,45 @@ function test_stlog_profile(n::Int, k::Int, σ; seed=9527, MaxIter=200, MaxTime=
             stats = @timed begin
                 flag, Record_Iter[s_ind, 1, l_ind], Profile = stlog_BCH_2k!(M_BCH1, Uk_BCH1, Up_BCH1, wsp_BCH; Stop=Stop, Init=stlog_init_guess_simple, order=1, builtin_log=true)
             end
-            Record[s_ind, 1, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            # Record[s_ind, 1, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            Record[s_ind, 1, l_ind] = Profile[1]
             Profile_BCH1_BIL[s_ind, l_ind, :] .= Profile
 
             stats = @timed begin
                 flag, Record_Iter[s_ind, 2, l_ind], Profile = stlog_BCH_2k!(M_BCH5, Uk_BCH5, Up_BCH5, wsp_BCH; Stop=Stop, Init=stlog_init_guess_simple, order=5, builtin_log=true)
             end
-            Record[s_ind, 2, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            # Record[s_ind, 2, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            Record[s_ind, 2, l_ind] = Profile[1]
             Profile_BCH5_BIL[s_ind, l_ind, :] .= Profile
 
             stats = @timed begin
                 flag, Record_Iter[s_ind, 3, l_ind], Profile = stlog_BCH_2k!(M_BCH1, Uk_BCH1, Up_BCH1, wsp_BCH; Stop=Stop, Init=stlog_init_guess_simple, order=1, builtin_log=false)
             end
-            Record[s_ind, 3, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            # Record[s_ind, 3, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            Record[s_ind, 3, l_ind] = Profile[1]
             Profile_BCH1_SOL[s_ind, l_ind, :] .= Profile
 
             stats = @timed begin
                 flag, Record_Iter[s_ind, 4, l_ind], Profile = stlog_BCH_2k!(M_BCH5, Uk_BCH5, Up_BCH5, wsp_BCH; Stop=Stop, Init=stlog_init_guess_simple, order=5, builtin_log=false)
             end
-            Record[s_ind, 4, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            # Record[s_ind, 4, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            Record[s_ind, 4, l_ind] = Profile[1]
             Profile_BCH5_SOL[s_ind, l_ind, :] .= Profile
 
             stats = @timed begin
                 flag, Record_Iter[s_ind, 5, l_ind], Profile = stlog_Newton!(M_Newton, Uk_Newton, Up_Newton, wsp_Newton; Stop=Stop, Solver_Stop=Solver_Stop, Init=stlog_init_guess_simple, NMLS_Set=NMLS_Set)
             end
-            Record[s_ind, 5, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            # Record[s_ind, 5, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            Record[s_ind, 5, l_ind] = Profile[1]
             Profile_Newton[s_ind, l_ind, :] .= Profile
 
             stats = @timed begin
                 flag, Record_Iter[s_ind, 6, l_ind], Profile = stlog_hybrid!(M_Hybrid, Uk_Hybrid, Up_Hybrid, wsp_Newton; Stop=Stop, Solver_Stop=Solver_Stop, Init=stlog_init_guess_simple, NMLS_Set=NMLS_Set)
             end
-            Record[s_ind, 6, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            # Record[s_ind, 6, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+            Record[s_ind, 6, l_ind] = Profile[1]
             Profile_Hybrid[s_ind, l_ind, :] .= Profile
+
         end
     end
     Profile_BCH1_BIL_AVG = reshape(mean(Profile_BCH1_BIL, dims=2), length(σ), 3)
@@ -806,62 +812,79 @@ function test_stlog_profile(n::Int, k::Int, σ; seed=9527, MaxIter=200, MaxTime=
     Hybrid_ACT = Profile_Hybrid_AVG[:, 4] ./ Profile_Hybrid_AVG[:, 1]
 
 
-    # plt_BCH1_BIL = plot(σ, BCH1_BIL_DIR, fillrange=:u, fillalpha=0.35, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH1 (Builtin log)", legend=:topleft)
-    # plot!(σ, BCH1_BIL_DIR .+ BCH1_BIL_UPD, fillrange=BCH1_BIL_UPD, fillalpha=0.35, label="Exp and Log")
-    # plot!(σ, ones(length(σ)), fillrange=BCH1_BIL_DIR .+ BCH1_BIL_UPD, fillalpha=0.35, label="Others")
-
     plt_BCH1_BIL = plot(σ, BCH1_BIL_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH1 (Builtin log)", yrange=(0, 1), legend=:outertopright)
     plot!(σ, BCH1_BIL_DIR .+ BCH1_BIL_UPD, label="Exp and Log")
     plot!(σ, ones(length(σ)), label="Others")
 
-    display(plt_BCH1_BIL)
 
     plt_BCH5_BIL = plot(σ, BCH5_BIL_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH5 (Builtin log)", yrange=(0, 1), legend=:outertopright)
     plot!(σ, BCH5_BIL_DIR .+ BCH5_BIL_UPD, label="Exp and Log")
     plot!(σ, ones(length(σ)), label="Others")
 
-    display(plt_BCH5_BIL)
+
 
     plt_BCH1_SOL = plot(σ, BCH1_SOL_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH1 (SpecOrth log)", yrange=(0, 1), legend=:outertopright)
     plot!(σ, BCH1_SOL_DIR .+ BCH1_SOL_UPD, label="Exp and Log")
     plot!(σ, ones(length(σ)), label="Others")
 
-    display(plt_BCH1_SOL)
+
 
     plt_BCH5_SOL = plot(σ, BCH5_SOL_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH5 (SpecOrth log)", yrange=(0, 1), legend=:outertopright)
     plot!(σ, BCH5_SOL_DIR .+ BCH5_SOL_UPD, label="Exp and Log")
     plot!(σ, ones(length(σ)), label="Others")
 
-    display(plt_BCH5_SOL)
+
 
     plt_Newton = plot(σ, Newton_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of Newton algorithm", yrange=(0, 1), legend=:outertopright)
     plot!(σ, Newton_ACT, label="Action of Dexp")
     plot!(σ, Newton_DIR .+ Newton_UPD, label="Exp and Log")
     plot!(σ, ones(length(σ)), label="Others")
 
-    display(plt_Newton)
 
     plt_Hybrid = plot(σ, Hybrid_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of Hybrid algorithm", yrange=(0, 1), legend=:outertopright)
     plot!(σ, Hybrid_ACT, label="Action of Dexp")
     plot!(σ, Hybrid_DIR .+ Hybrid_UPD, label="Exp and Log")
     plot!(σ, ones(length(σ)), label="Others")
 
+
+
+
+    savefig(plt_BCH1_BIL, "figures/Profile_BCH1_BIL_n$(n)_k$(k)_s$(seed).pdf")
+    savefig(plt_BCH5_BIL, "figures/Profile_BCH5_BIL_n$(n)_k$(k)_s$(seed).pdf")
+    savefig(plt_BCH1_SOL, "figures/Profile_BCH1_SOL_n$(n)_k$(k)_s$(seed).pdf")
+    savefig(plt_BCH5_SOL, "figures/Profile_BCH5_SOL_n$(n)_k$(k)_s$(seed).pdf")
+    savefig(plt_Newton, "figures/Profile_Newton_n$(n)_k$(k)_s$(seed).pdf")
+    savefig(plt_Hybrid, "figures/Profile_Hybrid_n$(n)_k$(k)_s$(seed).pdf")
+
+
+    RecordMin = reshape(minimum(Record, dims=3), length(σ), num_alg)
+    RecordIterMin = reshape(minimum(Record_Iter, dims=3), length(σ), num_alg)
+
+    # plt = plot(σ, RecordMin[:, [4, 7, 5, 6]], xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time(ns): exp(S_{A,B,0})I_{n,k} = U", legend=:topleft, labels=["BCH5 SpecOrth logarithm" "BCH5 (old implementation)" "Newton" "Hybrid"], yscale=:log10)
+
+    # display(plt)
+
+    # plt2 = plot(σ, RecordIterMin[:, [4, 7, 5, 6]], xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Iterations to Convergence", legend=:topleft, labels=["BCH5 SpecOrth logarithm" "BCH5 (old implementation)" "Newton" "Hybrid"])
+
+    # display(plt2)
+
+    plt_time = plot(σ, RecordMin, xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time(ns): exp(S_{A,B,0})I_{n,k} = U", legend=:topleft, labels=["BCH1 general logarithm" "BCH5 general logarithm" "BCH1 SpecOrth logarithm" "BCH5 SpecOrth logarithm" "Newton" "Hybrid"], yscale=:log10)
+
+    plt_iter = plot(σ, RecordIterMin, xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Number of Iterations to Convergence", legend=:topleft, labels=["BCH1 general logarithm" "BCH5 general logarithm" "BCH1 SpecOrth logarithm" "BCH5 SpecOrth logarithm" "Newton" "Hybrid"])
+
+
+    savefig(plt_time, "figures/Stlog_Time_n$(n)_k$(k)_s$(seed).pdf")
+    savefig(plt_iter, "figures/Stlog_Iter_n$(n)_k$(k)_s$(seed).pdf")
+
+    display(plt_BCH1_SOL)
+    display(plt_BCH1_BIL)
+    display(plt_BCH5_BIL)
+    display(plt_BCH5_SOL)
+    display(plt_Newton)
     display(plt_Hybrid)
 
-    savefig(plt_BCH1_BIL, "figures/Profile_BCH1_BIL.pdf")
-    savefig(plt_BCH5_BIL, "figures/Profile_BCH5_BIL.pdf")
-    savefig(plt_BCH1_SOL, "figures/Profile_BCH1_SOL.pdf")
-    savefig(plt_BCH5_SOL, "figures/Profile_BCH5_SOL.pdf")
-    savefig(plt_Newton, "figures/Profile_Newton.pdf")
-    savefig(plt_Hybrid, "figures/Profile_Hybrid.pdf")
+    display(plt_time)
+    display(plt_iter)
 
-
-    # RecordMin = reshape(minimum(Record, dims=3), length(σ), num_alg)
-    # RecordIterMin = reshape(minimum(Record_Iter, dims=3), length(σ), num_alg)
-
-    # plt = plot(σ, RecordMin, xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time(ns): exp(S_{A,B,0})I_{n,k} = U", legend=:topleft, labels=["BCH1 general logarithm" "BCH5 general logarithm" "BCH1 SpecOrth logarithm" "BCH5 SpecOrth logarithm" "Newton" "Hybrid"], yscale=:log10)
-
-    # plt2 = plot(σ, RecordIterMin, xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Number of Iterations to Convergence", legend=:topleft, labels=["BCH1 general logarithm" "BCH5 general logarithm" "BCH1 SpecOrth logarithm" "BCH5 SpecOrth logarithm" "Newton" "Hybrid"])
-
-    # display(plot(plt, plt2, layout=(2, 1)))
+    @printf "Random Seed: \t %i\n" seed
 end

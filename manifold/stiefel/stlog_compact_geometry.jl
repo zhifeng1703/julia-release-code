@@ -53,8 +53,8 @@ _stlog_ret!(M::Ref{Matrix{Float64}}, M_saf::SAFactor, Up::Ref{Matrix{Float64}}, 
     nearby ? _stlog_ret_nearby!(M, M_saf, Up, U, Z, M_sys, n, k, wsp_stlog_ret) : _stlog_ret_principal!(M, M_saf, Up, U, Z, n, k, wsp_stlog_ret);
 
 
-function _stlog_ret_principal!(M::Ref{Matrix{Float64}}, M_saf::SAFactor, Up::Ref{Matrix{Float64}}, U::Ref{Matrix{Float64}}, Z::Ref{Matrix{Float64}}, n, k, wsp_stlog_ret::WSP)
-    MatU = U[]
+function _stlog_ret_principal!(M::Ref{Matrix{Float64}}, M_saf::SAFactor, Up::Ref{Matrix{Float64}}, Uk::Ref{Matrix{Float64}}, Z::Ref{Matrix{Float64}}, n, k, wsp_stlog_ret::WSP)
+    MatUk = Uk[]
     MatUp = Up[]
     MatM = M[]
 
@@ -66,12 +66,15 @@ function _stlog_ret_principal!(M::Ref{Matrix{Float64}}, M_saf::SAFactor, Up::Ref
 
     _stlog_ret_exp!(eZ, Z)
 
-    copyto!(view(MatM, :, 1:k), MatU)
+    copyto!(view(MatM, :, 1:k), MatUk)
     mul!(view(MatM, :, (k+1):n), MatUp, MateZ)
     copyto!(MatUp, view(MatM, :, (k+1):n))
 
-    schurAngular_SpecOrth!(M_saf, M, wsp_saf_n, order=true, regular=true)
-    computeSkewSymm!(M, M_saf)
+    log_SpecOrth!(M, M_saf, M, wsp_saf_n; order=false, regular=false)
+
+
+    # schurAngular_SpecOrth!(M_saf, M, wsp_saf_n, order=false, regular=false)
+    # computeSkewSymm!(M, M_saf)
 end
 
 function _stlog_ret_nearby!(M::Ref{Matrix{Float64}}, M_saf::SAFactor, Up::Ref{Matrix{Float64}}, U::Ref{Matrix{Float64}}, Z::Ref{Matrix{Float64}}, M_sys::dexp_SkewSymm_system, n, k, wsp_stlog_ret::WSP)
@@ -104,6 +107,88 @@ function _stlog_ret_nearby!(M::Ref{Matrix{Float64}}, M_saf::SAFactor, Up::Ref{Ma
     copyto!(MatUp, view(MatM, :, (k+1):n))
 
     nearlog_SpecOrth!(M, eM, S, eS, M_saf, M_sys, wsp_nearlog_n)
+end
+
+@inline get_wsp_stlog_UpZ_ret(n::Int, k::Int) = WSP(Matrix{Float64}(undef, n - k, n - k), Matrix{Float64}(undef, n, n - k), get_wsp_saf(n - k), get_wsp_saf(n))
+@inline get_wsp_stlog_UpZ_ret(n::Int, k::Int, wsp_saf_m::WSP, wsp_saf_n::WSP) = WSP(Matrix{Float64}(undef, n - k, n - k), Matrix{Float64}(undef, n, n - k), wsp_saf_m, wsp_saf_n)
+
+function ret_UpZ_builtin_exp!(U::Ref{Matrix{Float64}}, Up::Ref{Matrix{Float64}}, M::Ref{Matrix{Float64}}, M_saf::SAFactor, Z::Ref{Matrix{Float64}}, wsp_stlog_UpZ_ret::WSP; nearlog::Bool=false)
+    # wsp_ret carrys real n-k x n-k matrix Mm, n x m matrix Mnm, workspaces wsp_exp and wsp_log
+    MatU = U[]
+    MatUp = Up[]
+    MatTmpm = wsp_stlog_UpZ_ret[1]
+    MatTmpnm = wsp_stlog_UpZ_ret[2]
+    wsp_saf_m = wsp_stlog_UpZ_ret[3]
+    wsp_saf_n = wsp_stlog_UpZ_ret[4]
+
+    Tmpm = wsp_stlog_UpZ_ret(1)
+
+
+    n::Int, m::Int = size(MatUp)
+    k::Int = n - m
+
+    # Q <- exp(Z), using scaling and squaring algorithm
+    # Z needs to ensure skew symmetry to guarantee special orthogonality in this exp(Z).
+    MatZ = Z[]
+    for r_ind = 1:m
+        for c_ind = 1:m
+            @inbounds MatZ[r_ind, c_ind] = (MatZ[r_ind, c_ind] - MatZ[c_ind, r_ind]) / 2.0
+            @inbounds MatZ[c_ind, r_ind] = -MatZ[r_ind, c_ind]
+        end
+    end
+    MatTmpm .= exp(MatZ)
+    copyto!(MatTmpm, exp(MatZ))
+    # exp_SkewSymm!(Tmpm, Z_saf, Z, wsp_saf_m)                                   
+
+
+    copyto!(MatTmpnm, MatUp)
+
+    mul!(MatUp, MatTmpnm, MatTmpm)                                              # Up <- Up * Q
+
+    copyto!(view(MatU, :, (k+1):n), MatUp)                                      # Write Up to U
+
+    if nearlog
+        nearlog_SpecOrth!(M, M_saf, U, M, wsp_saf_n; order=true, regular=true)        # Get the nearest log of U from M and overwrite it to M
+    else
+        log_SpecOrth!(M, M_saf, U, wsp_saf_n; order=false, regular=false)
+        # schurAngular_SpecOrth!(M_saf, M, wsp_saf_n, order=false, regular=false)
+        # computeSkewSymm!(M, M_saf)
+    end
+end
+
+function ret_UpZ_builtin_exp2!(U::Ref{Matrix{Float64}}, Up::Ref{Matrix{Float64}}, M::Ref{Matrix{Float64}}, M_saf::SAFactor, Z::Ref{Matrix{Float64}}, wsp_stlog_UpZ_ret::WSP; nearlog::Bool=false)
+    # wsp_ret carrys real n-k x n-k matrix Mm, n x m matrix Mnm, workspaces wsp_exp and wsp_log
+    MatU = U[]
+    MatUp = Up[]
+    MatTmpm = wsp_stlog_UpZ_ret[1]
+    MatTmpnm = wsp_stlog_UpZ_ret[2]
+    wsp_saf_m = wsp_stlog_UpZ_ret[3]
+    wsp_saf_n = wsp_stlog_UpZ_ret[4]
+
+    Tmpm = wsp_stlog_UpZ_ret(1)
+
+
+    n::Int, m::Int = size(MatUp)
+    k::Int = n - m
+
+    # Q <- exp(Z), using scaling and squaring algorithm
+    # Z needs to ensure skew symmetry to guarantee special orthogonality in this exp(Z).
+    MatZ = Z[]
+    for r_ind = 1:m
+        for c_ind = 1:m
+            @inbounds MatZ[r_ind, c_ind] = (MatZ[r_ind, c_ind] - MatZ[c_ind, r_ind]) / 2.0
+            @inbounds MatZ[c_ind, r_ind] = -MatZ[r_ind, c_ind]
+        end
+    end
+    copyto!(MatTmpm, exp(MatZ))
+    # exp_SkewSymm!(Tmpm, Z_saf, Z, wsp_saf_m)                                   
+
+    _stlog_ret_exp!(Tmpm, Z)
+
+    mul!(view(MatU, :, (k+1):n), MatUp, MatTmpm)
+    copyto!(MatUp, view(MatU, :, (k+1):n))
+
+    log_SpecOrth!(M, M_saf, U, wsp_saf_n; order=false, regular=false)
 end
 
 #######################################Test functions#######################################
@@ -160,4 +245,5 @@ function test_stlog_ret_speed(n, k; loops=1000)
     @printf "+-----------------------+---------------+---------------+---------------+\n\n"
 
 end
+
 
