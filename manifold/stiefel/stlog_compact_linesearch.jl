@@ -11,7 +11,9 @@ function hor_BB_step!(α_pre::Float64, sq_pre::Float64, Z_cur_r::Ref{Matrix{Floa
     α_cur::Float64 = α_pre * sq_pre / (sq_pre - inner_skew!(Z_cur_r, αZ_pre_r) / α_pre)
     sq_cur::Float64 = inner_skew!(Z_cur_r, Z_cur_r)
 
-    return max(α_cur, 1.0), sq_cur
+    # return max(α_cur, 1.0), sq_cur
+    return α_cur, sq_cur
+
 end
 
 function stlog_UpZ_NMLS!(fval::Ref{Vector{Float64}}, slope::Float64, init::Float64, Z::Ref{Matrix{Float64}}, αZ::Ref{Matrix{Float64}},
