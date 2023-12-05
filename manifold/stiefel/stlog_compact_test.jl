@@ -6,7 +6,7 @@ global STLOG_ENABLE_NEARLOG = false
 global STLOG_HYBRID_BCH_MAXITER = 6
 global STLOG_HYBRID_BCH_ABSTOL = 1e-7
 
-_STLOG_TEST_SOLVER_STOP = terminator(100, 100000, 1e-7, 1e-7)
+_STLOG_TEST_SOLVER_STOP = terminator(3000, 100000, 1e-8, 1e-8)
 _STLOG_TEST_NMLS_SET = NMLS_Paras(0.1, 20.0, 0.9, 0.3, 0)
 
 global bad_set_newton = (0, 0, 9527, 0.0)
@@ -539,3 +539,84 @@ stlog_simple_test(n, k, scatter_num, seed; show_plts=true, save_plts=false) = te
     save_plts=save_plts, show_plts=show_plts, loops=3, seed=seed,
     Solver_Stop=_STLOG_TEST_SOLVER_STOP,
     NMLS_Set=_STLOG_TEST_NMLS_SET)
+
+function stlog_read_time_data(filename)
+    labels = []
+    RecordTime = []
+    RecordIter = []
+    n::Int = 0
+    k::Int = 0
+    seed::Int = 0
+    alg_num::Int = 0
+    σ = []
+
+    open(filename, "r") do io
+        line = readline(io)
+        println(line)
+        line = readline(io)
+        println(line)
+        line = readline(io)
+        n, k, seed, σ_num, alg_num = readdlm(IOBuffer(line), Int)
+
+        line = readline(io)
+        σ = readdlm(IOBuffer(line))
+        line = readline(io)
+
+
+        for alg_ind in 1:alg_num
+            line = readline(io)
+            push!(labels, line)
+            lines = readuntil(io, "\n\n")
+            MatTime = readdlm(IOBuffer(lines), Int)
+            push!(RecordTime, MatTime)
+        end
+
+        for alg_ind in 1:alg_num
+            line = readline(io)
+            lines = readuntil(io, "\n\n")
+            MatIter = readdlm(IOBuffer(lines), Int)
+            push!(RecordIter, MatIter)
+        end
+    end
+
+    return n, k, alg_num, labels, σ, RecordTime, RecordIter
+end
+
+function stlog_plot_time_data(filename)
+    n, k, alg_num, labels, σ, RecordTime, RecordIter = stlog_read_time_data(filename)
+
+
+    RecordTime_AVG = hcat([reshape(mean(MatTime, dims=1), length(σ)) for MatTime in RecordTime]...)
+    RecordTime_STD = hcat([reshape(std(MatTime, dims=1), length(σ)) for MatTime in RecordTime]...)
+    RecordTime_MIN = hcat([reshape(minimum(MatTime, dims=1), length(σ)) for MatTime in RecordTime]...)
+    RecordTime_MAX = hcat([reshape(maximum(MatTime, dims=1), length(σ)) for MatTime in RecordTime]...)
+
+
+    RecordIter_AVG = hcat([reshape(mean(MatIter, dims=1), length(σ)) for MatIter in RecordIter]...)
+    RecordIter_STD = hcat([reshape(std(MatIter, dims=1), length(σ)) for MatIter in RecordIter]...)
+    RecordIter_MIN = hcat([reshape(minimum(MatIter, dims=1), length(σ)) for MatIter in RecordIter]...)
+    RecordIter_MAX = hcat([reshape(maximum(MatIter, dims=1), length(σ)) for MatIter in RecordIter]...)
+
+    labels = reshape(labels, 1, length(labels))
+    σ = reshape(σ, length(σ))
+
+    plt_time = plot(xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Compute Time to Convergence (ns)")
+    plot!(σ, RecordTime_AVG, ribbon=RecordTime_STD, fillalpha=0.4, label=labels)
+
+    plt_time_log = plot(xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Compute Time to Convergence (ns)")
+    plot!(σ, RecordTime_AVG, ribbon=(RecordTime_MIN, RecordTime_MAX), fillalpha=0.4, label=labels, yscale=:log10, legend=:topleft, xticks=[0.0, 1.0, 2.5], yticks=collect([10.0^(-i) for i in -9:1]))
+
+    plt_iter = plot(xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Number of Iterations to Convergence (ns)")
+    plot!(σ, RecordIter_AVG, ribbon=RecordIter_STD, fillalpha=0.4, label=labels)
+
+    plt_iter_ribbon = plot(xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Number of Iterations to Convergence (ns)")
+    plot!(σ, RecordIter_AVG, ribbon=(RecordIter_MIN, RecordIter_MAX), fillalpha=0.4, label=labels, legend=:topleft)
+
+    display(plt_time)
+    display(plt_time_log)
+    display(plt_iter)
+    display(plt_iter_ribbon)
+
+
+
+end

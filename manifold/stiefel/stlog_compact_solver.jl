@@ -864,41 +864,36 @@ function test_stlog_profile(n::Int, k::Int, σ; show_plts=false, save_plts=false
     Hybrid_ACT = Profile_Hybrid_AVG[:, 4] ./ Profile_Hybrid_AVG[:, 1]
 
 
-    plt_BCH1_BIL = plot(σ, BCH1_BIL_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH1 (Builtin log)", yrange=(0, 1), legend=:outertopright)
-    plot!(σ, BCH1_BIL_DIR .+ BCH1_BIL_UPD, label="Exp and Log")
-    plot!(σ, ones(length(σ)), label="Others")
+    plt_BCH1_BIL = plot(σ, BCH1_BIL_DIR, ribbon=(BCH1_BIL_DIR, zeros(length(σ))), fillalpha=0.5, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH1 (Builtin log)", yrange=(0, 1), legend=:outertopright)
+    plot!(σ, BCH1_BIL_DIR .+ BCH1_BIL_UPD, ribbon=(BCH1_BIL_UPD,), fillalpha=0.5, label="Exp and Log")
+    plot!(σ, ones(length(σ)), ribbon=(ones(length(σ)) .- BCH1_BIL_DIR .- BCH1_BIL_UPD,), fillalpha=0.5, label="Others")
 
 
-    plt_BCH5_BIL = plot(σ, BCH5_BIL_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH5 (Builtin log)", yrange=(0, 1), legend=:outertopright)
-    plot!(σ, BCH5_BIL_DIR .+ BCH5_BIL_UPD, label="Exp and Log")
-    plot!(σ, ones(length(σ)), label="Others")
-
-
-
-    plt_BCH1_SOL = plot(σ, BCH1_SOL_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH1 (SpecOrth log)", yrange=(0, 1), legend=:outertopright)
-    plot!(σ, BCH1_SOL_DIR .+ BCH1_SOL_UPD, label="Exp and Log")
-    plot!(σ, ones(length(σ)), label="Others")
+    plt_BCH5_BIL = plot(σ, BCH5_BIL_DIR, ribbon=(BCH5_BIL_DIR, zeros(length(σ))), fillalpha=0.5, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH5 (Builtin log)", yrange=(0, 1), legend=:outertopright)
+    plot!(σ, BCH5_BIL_DIR .+ BCH5_BIL_UPD, ribbon=(BCH5_BIL_UPD,), fillalpha=0.5, label="Exp and Log")
+    plot!(σ, ones(length(σ)), ribbon=(ones(length(σ)) .- BCH5_BIL_DIR .- BCH5_BIL_UPD,), fillalpha=0.5, label="Others")
 
 
 
-    plt_BCH5_SOL = plot(σ, BCH5_SOL_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH5 (SpecOrth log)", yrange=(0, 1), legend=:outertopright)
-    plot!(σ, BCH5_SOL_DIR .+ BCH5_SOL_UPD, label="Exp and Log")
-    plot!(σ, ones(length(σ)), label="Others")
+    plt_BCH1_SOL = plot(σ, BCH1_SOL_DIR, ribbon=(BCH1_SOL_DIR, zeros(length(σ))), fillalpha=0.5, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH1 (SpecOrth log)", yrange=(0, 1), legend=:outertopright)
+    plot!(σ, BCH1_SOL_DIR .+ BCH1_SOL_UPD, ribbon=(BCH1_SOL_UPD,), fillalpha=0.5, label="Exp and Log")
+    plot!(σ, ones(length(σ)), ribbon=(ones(length(σ)) .- BCH1_SOL_DIR .- BCH1_SOL_UPD,), fillalpha=0.5, label="Others")
 
 
 
-    plt_Newton = plot(σ, Newton_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of Newton algorithm", yrange=(0, 1), legend=:outertopright)
-    plot!(σ, Newton_ACT, label="Action of Dexp")
-    plot!(σ, Newton_DIR .+ Newton_UPD, label="Exp and Log")
-    plot!(σ, ones(length(σ)), label="Others")
+    plt_BCH5_SOL = plot(σ, BCH5_SOL_DIR, ribbon=(BCH5_SOL_DIR, zeros(length(σ))), fillalpha=0.5, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of BCH5 (SpecOrth log)", yrange=(0, 1), legend=:outertopright)
+    plot!(σ, BCH5_SOL_DIR .+ BCH5_SOL_UPD, ribbon=(BCH5_SOL_UPD,), fillalpha=0.5, label="Exp and Log")
+    plot!(σ, ones(length(σ)), ribbon=(ones(length(σ)) .- BCH5_SOL_DIR .- BCH5_SOL_UPD,), fillalpha=0.5, label="Others")
 
+    plt_Newton = plot(σ, Newton_ACT, ribbon=(Newton_ACT, zeros(length(σ))), fillalpha=0.5, label="Dexp in GMRES", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of Newton algorithm", yrange=(0, 1), legend=:outertopright)
+    plot!(σ, Newton_DIR, ribbon=(Newton_DIR .- Newton_ACT,), fillalpha=0.5, label="GMRES")
+    plot!(σ, Newton_DIR .+ Newton_UPD, ribbon=(Newton_UPD,), fillalpha=0.5, label="Exp and Log")
+    plot!(σ, ones(length(σ)), ribbon=(ones(length(σ)) .- Newton_DIR .- Newton_UPD,), fillalpha=0.5, label="Others")
 
-    plt_Hybrid = plot(σ, Hybrid_DIR, label="Update Direction", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of Hybrid algorithm", yrange=(0, 1), legend=:outertopright)
-    plot!(σ, Hybrid_ACT, label="Action of Dexp")
-    plot!(σ, Hybrid_DIR .+ Hybrid_UPD, label="Exp and Log")
-    plot!(σ, ones(length(σ)), label="Others")
-
-
+    plt_Hybrid = plot(σ, Hybrid_ACT, ribbon=(Hybrid_ACT, zeros(length(σ))), fillalpha=0.5, label="Dexp in GMRES", xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time Profile of Hybrid algorithm", yrange=(0, 1), legend=:outertopright)
+    plot!(σ, Hybrid_DIR, ribbon=(Hybrid_DIR .- Hybrid_ACT,), fillalpha=0.5, label="GMRES")
+    plot!(σ, Hybrid_DIR .+ Hybrid_UPD, ribbon=(Hybrid_UPD,), fillalpha=0.5, label="Exp and Log")
+    plot!(σ, ones(length(σ)), ribbon=(ones(length(σ)) .- Hybrid_DIR .- Hybrid_UPD,), fillalpha=0.5, label="Others")
 
 
 
@@ -1077,14 +1072,161 @@ function test_stlog_time(n::Int, k::Int, σ, sample=10; show_plts=false, save_pl
     # display(plt2)
 
     plt_time = plot(xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Compute Time to Convergence (ns)", yscale=:log10)
-    plot!(σ, RecordTime_Avg, ribbon=RecordTime_STD, fillalpha=0.4, label=["BCH5 SpecOrth logarithm" "Newton Algorithm" "Hybrid Algorithm"])
+    plot!(σ, RecordTime_Avg, ribbon=RecordTime_STD, fillalpha=0.5, label=["BCH5 SpecOrth logarithm" "Newton Algorithm" "Hybrid Algorithm"])
 
     plt_iter = plot(xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Number of Iterations to Convergence (ns)", yscale=:log10)
-    plot!(σ, RecordIter_Avg, ribbon=RecordIter_STD, fillalpha=0.4, label=["BCH5 SpecOrth logarithm" "Newton Algorithm" "Hybrid Algorithm"])
+    plot!(σ, RecordIter_Avg, ribbon=RecordIter_STD, fillalpha=0.5, label=["BCH5 SpecOrth logarithm" "Newton Algorithm" "Hybrid Algorithm"])
 
     if save_plts
         savefig(plt_time, "figures/Stlog_Time_n$(n)_k$(k)_seed$(seed)_sample$(sample).pdf")
         savefig(plt_iter, "figures/Stlog_Iter_n$(n)_k$(k)_seed$(seed)_sample$(sample).pdf")
+    end
+
+    if show_plts
+        display(plt_time)
+        display(plt_iter)
+    end
+
+    @printf "Random Seed: \t %i\n" seed
+end
+
+function test_stlog_bch_time(n::Int, k::Int, σ, sample=10; show_plts=false, save_plts=false, seed=9527, MaxIter=200, MaxTime=10, AbsTol=1e-12, loops=10, Solver_Stop=terminator(500, Int(round(1e6)), 1e-10, 1e-8), NMLS_Set=NMLS_Paras(0.2, 20.0, 0.9, 0.3, 0))
+    eng = MersenneTwister(seed)
+    num_alg = 4
+    RecordTime = zeros(Int, length(σ), num_alg, loops, sample)
+    RecordIter = zeros(Int, length(σ), num_alg, loops, sample)
+
+
+    for sample_ind in 1:sample
+        MatS = rand(eng, n, n)
+        fill!(view(MatS, (k+1):n, (k+1):n), 0.0)
+        MatS .-= MatS'
+
+        wsp_BCH = get_wsp_stlog_BCH(n, k)
+        wsp_Newton = get_wsp_stlog_Newton(n, k)
+
+
+
+        Stop = terminator(MaxIter, Int(round(MaxTime * 1e9)), AbsTol, AbsTol)
+
+
+        for s_ind in eachindex(σ)
+            s = σ[s_ind]
+
+            MatS .*= s / opnorm(MatS, 2)
+
+            MatU = exp(MatS)
+
+            MatM_BCH1 = zeros(n, n)
+            MatUk_BCH1 = copy(view(MatU, :, 1:k))
+            MatUp_BCH1 = copy(view(MatU, :, (k+1):n))
+
+            MatM_BCH5 = zeros(n, n)
+            MatUk_BCH5 = copy(view(MatU, :, 1:k))
+            MatUp_BCH5 = copy(view(MatU, :, (k+1):n))
+
+
+            M_BCH1 = Ref(MatM_BCH1)
+            Uk_BCH1 = Ref(MatUk_BCH1)
+            Up_BCH1 = Ref(MatUp_BCH1)
+
+            M_BCH5 = Ref(MatM_BCH5)
+            Uk_BCH5 = Ref(MatUk_BCH5)
+            Up_BCH5 = Ref(MatUp_BCH5)
+
+            for l_ind in 1:loops
+
+                stats = @timed begin
+                    flag, RecordIter[s_ind, 1, l_ind, sample_ind], Profile = stlog_BCH_2k!(M_BCH1, Uk_BCH1, Up_BCH1, wsp_BCH; Stop=Stop, Init=stlog_init_guess_simple, order=1, builtin_log=true)
+                end
+                # Record[s_ind, 1, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+                RecordTime[s_ind, 1, l_ind] = Profile[1]
+
+                stats = @timed begin
+                    flag, RecordIter[s_ind, 2, l_ind, sample_ind], Profile = stlog_BCH_2k!(M_BCH5, Uk_BCH5, Up_BCH5, wsp_BCH; Stop=Stop, Init=stlog_init_guess_simple, order=5, builtin_log=true)
+                end
+                # Record[s_ind, 2, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+                RecordTime[s_ind, 2, l_ind] = Profile[1]
+
+                stats = @timed begin
+                    flag, RecordIter[s_ind, 3, l_ind, sample_ind], Profile = stlog_BCH_2k!(M_BCH1, Uk_BCH1, Up_BCH1, wsp_BCH; Stop=Stop, Init=stlog_init_guess_simple, order=1, builtin_log=false)
+                end
+                # Record[s_ind, 3, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+                RecordTime[s_ind, 3, l_ind] = Profile[1]
+
+                stats = @timed begin
+                    flag, RecordIter[s_ind, 4, l_ind, sample_ind], Profile = stlog_BCH_2k!(M_BCH5, Uk_BCH5, Up_BCH5, wsp_BCH; Stop=Stop, Init=stlog_init_guess_simple, order=5, builtin_log=false)
+                end
+                # Record[s_ind, 4, l_ind] = Int(round((stats.time - stats.gctime) * 1e9))
+                RecordTime[s_ind, 4, l_ind] = Profile[1]
+            end
+        end
+
+    end
+
+    RecordTime = reshape(minimum(RecordTime, dims=3), length(σ), num_alg, sample)
+    RecordIter = reshape(minimum(RecordIter, dims=3), length(σ), num_alg, sample)
+
+    open("figures/stlog_bch_data_n$(n)_k$(k)_seed$(seed).txt", "w") do io
+        write(io, "// n = $(n), k = $(k), seed = $(seed), # of sigma = $(length(σ)), # of algorithms = $(num_alg)\n")
+        write(io, "BCH1 Built-in logarithm\tBCH5 Bulit-in logarithm\tBCH1 SpecOrth logarithm\tBCH5 SpecOrth logarithm\t\n")
+        write(io, "$(n)\t$(k)\t$(seed)\t$(length(σ))\t$(num_alg)\n")
+
+        writedlm(io, reshape(collect(σ), 1, length(σ)))
+
+        write(io, "\nBCH1 Built-in logarithm\n")
+        for ind in 1:sample
+            writedlm(io, reshape(RecordTime[:, 1, ind], 1, length(σ)))
+        end
+
+        write(io, "\nBCH5 Built-in logarithm\n")
+        for ind in 1:sample
+            writedlm(io, reshape(RecordTime[:, 2, ind], 1, length(σ)))
+        end
+
+        write(io, "\nBCH1 SpecOrth logarithm\n")
+        for ind in 1:sample
+            writedlm(io, reshape(RecordTime[:, 3, ind], 1, length(σ)))
+        end
+
+        write(io, "\nBCH5 SpecOrth logarithm\n")
+        for ind in 1:sample
+            writedlm(io, reshape(RecordTime[:, 4, ind], 1, length(σ)))
+        end
+    end
+
+    RecordTime_Avg = reshape(mean(RecordTime, dims=3), length(σ), num_alg)
+    RecordIter_Avg = reshape(mean(RecordIter, dims=3), length(σ), num_alg)
+
+    RecordTime_Min = reshape(minimum(RecordTime, dims=3), length(σ), num_alg)
+    RecordIter_Min = reshape(minimum(RecordIter, dims=3), length(σ), num_alg)
+
+    RecordTime_Max = reshape(maximum(RecordTime, dims=3), length(σ), num_alg)
+    RecordIter_Max = reshape(maximum(RecordIter, dims=3), length(σ), num_alg)
+
+    RecordTime_STD = reshape(std(RecordTime, dims=3), length(σ), num_alg)
+    RecordIter_STD = reshape(std(RecordIter, dims=3), length(σ), num_alg)
+
+
+    # plt = plot(σ, RecordMin[:, [4, 7, 5, 6]], xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Time(ns): exp(S_{A,B,0})I_{n,k} = U", legend=:topleft, labels=["BCH5 SpecOrth logarithm" "BCH5 (old implementation)" "Newton" "Hybrid"], yscale=:log10)
+
+    # display(plt)
+
+    # plt2 = plot(σ, RecordIterMin[:, [4, 7, 5, 6]], xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Iterations to Convergence", legend=:topleft, labels=["BCH5 SpecOrth logarithm" "BCH5 (old implementation)" "Newton" "Hybrid"])
+
+    # display(plt2)
+
+    plt_time = plot(σ, RecordTime_Avg, fillrange=(RecordTime_Min, RecordTime_Max), fillalpha=0.3,
+        xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Compute Time to Convergence (ns)", yscale=:none,
+        label=["BCH1 Built-in logarithm" "BCH5 Bulit-in logarithm" "BCH1 SpecOrth logarithm" "BCH5 SpecOrth logarithm"], legend=:topleft, xticks=[0.0, 1.0, 2.5], yticks=collect([10.0^(-i) for i = -9:1])
+    )
+
+    plt_iter = plot(xlabel="σ in U = exp(σ⋅S)I_{n,p} with |S|_2 = 1", ylabel="Number of Iterations to Convergence (ns)")
+    plot!(σ, RecordIter_Avg, ribbon=(RecordIter_Avg .- RecordIter_Min, RecordIter_Max .- RecordIter_Avg), fillalpha=0.5, label=["BCH1 Built-in logarithm" "BCH5 Bulit-in logarithm" "BCH1 SpecOrth logarithm" "BCH5 SpecOrth logarithm"])
+
+    if save_plts
+        savefig(plt_time, "figures/Stlog_BCH_Time_n$(n)_k$(k)_seed$(seed)_sample$(sample).pdf")
+        savefig(plt_iter, "figures/Stlog_BCH_Iter_n$(n)_k$(k)_seed$(seed)_sample$(sample).pdf")
     end
 
     if show_plts
