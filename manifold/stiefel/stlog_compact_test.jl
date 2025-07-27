@@ -617,6 +617,5 @@ function stlog_plot_time_data(filename)
     display(plt_iter)
     display(plt_iter_ribbon)
 
-
-
+    savefig(plt_time_log, "figures/stlog_time_n$(n)_k$(k).pdf")
 end
