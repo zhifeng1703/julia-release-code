@@ -5,223 +5,127 @@ using LinearAlgebra
 include("mincut.jl")
 include("treeObj.jl")
 
-"""
-    geodesic_data(treeA::PhyloTree, treeB::PhyloTree)
 
-Build the support-refinement input for the BHV geodesic computation between
-two phylogenetic trees.
+struct SupportPair
+    A::Vector{Bipart}
+    WA::Vector{Float64}
+    B::Vector{Bipart}
+    WB::Vector{Float64}
+end
 
-Returns a named tuple with fields
+struct SharedPair
+    C::Vector{Bipart}
+    W0::Vector{Float64}
+    W1::Vector{Float64}
+end
 
-- `c`      : squared contribution from common internal bipartitions
-- `a`      : weights of internal bipartitions present only in treeA
-- `b`      : weights of internal bipartitions present only in treeB
-- `edgea`  : bipartitions corresponding to `a`
-- `edgeb`  : bipartitions corresponding to `b`
-- `inc`    : incompatibility matrix between `edgea` and `edgeb`
-"""
-function geodesic_data(treeA::PhyloTree, treeB::PhyloTree)
+struct PathInfo
+    curve_length::Float64
+    status::Symbol
+    abserr::Float64
+    relerr::Float64
+    abstol::Float64
+    reltol::Float64
+    mincut_sizes::Vector{Tuple{Int,Int}}
+end
+
+function _shared_sqdist(shared::SharedPair)
+    return sum((shared.W0[i] - shared.W1[i])^2 for i in eachindex(shared.C))
+end
+
+function geodesic_initial(treeA::PhyloTree, treeB::PhyloTree)
     mapA = Dict{Bipart,Float64}(treeA.ib[i] => treeA.iw[i] for i in eachindex(treeA.ib))
     mapB = Dict{Bipart,Float64}(treeB.ib[i] => treeB.iw[i] for i in eachindex(treeB.ib))
 
-    common_set = intersect(Set(treeA.ib), Set(treeB.ib))
-    common = collect(common_set)
+    allA = collect(treeA.ib)
+    allB = collect(treeB.ib)
 
-    common_wa = Dict{Bipart,Float64}(e => mapA[e] for e in common)
-    common_wb = Dict{Bipart,Float64}(e => mapB[e] for e in common)
+    common_set = Set{Bipart}()
 
-    c = 0.0
-    for e in common
-        c += (common_wa[e] - common_wb[e])^2
-    end
-
-    edgea = Bipart[]
-    a = Float64[]
-    for i in eachindex(treeA.ib)
-        e = treeA.ib[i]
-        if !(e in common_set)
-            push!(edgea, e)
-            push!(a, treeA.iw[i])
+    for e in allA
+        if haskey(mapB, e) || all(_bipart_comp(e, f) for f in allB)
+            push!(common_set, e)
         end
     end
 
-    edgeb = Bipart[]
-    b = Float64[]
-    for j in eachindex(treeB.ib)
-        e = treeB.ib[j]
-        if !(e in common_set)
-            push!(edgeb, e)
-            push!(b, treeB.iw[j])
+    for e in allB
+        if haskey(mapA, e) || all(_bipart_comp(f, e) for f in allA)
+            push!(common_set, e)
         end
     end
 
-    inc = falses(length(edgea), length(edgeb))
-    for i in eachindex(edgea), j in eachindex(edgeb)
-        inc[i, j] = !_bipart_comp(edgea[i], edgeb[j])
+    C = collect(common_set)
+
+    shared = SharedPair(
+        C,
+        [get(mapA, e, 0.0) for e in C],
+        [get(mapB, e, 0.0) for e in C],
+    )
+
+    A = Bipart[]
+    WA = Float64[]
+    for e in allA
+        e in common_set && continue
+        push!(A, e)
+        push!(WA, mapA[e])
     end
 
-    return (
-        c = c,
-        a = a,
-        b = b,
-        edgea = edgea,
-        edgeb = edgeb,
-        inc = inc,
-        common = common,
-        common_wa = common_wa,
-        common_wb = common_wb,
-    )
+    B = Bipart[]
+    WB = Float64[]
+    for e in allB
+        e in common_set && continue
+        push!(B, e)
+        push!(WB, mapB[e])
+    end
+
+    pa = sortperm(WA; rev=true)
+    pb = sortperm(WB; rev=true)
+
+    A = A[pa]
+    WA = WA[pa]
+    B = B[pb]
+    WB = WB[pb]
+
+    initial = SupportPair(A, WA, B, WB)
+
+    inc = falses(length(A), length(B))
+    for i in eachindex(A), j in eachindex(B)
+        inc[i, j] = !_bipart_comp(A[i], B[j])
+    end
+
+    return initial, shared, inc
 end
 
-
-"""
-    geodesic_support(treeA::PhyloTree, treeB::PhyloTree; abstol=0.0, reltol=0.0)
-
-Compute the support sequence for the BHV geodesic between two trees by calling
-`refine_support`.
-
-Returns a named tuple with fields
-
-- all outputs of `refine_support`
-- plus `c`, `a`, `b`, `edgea`, `edgeb`, `inc`
-"""
-function geodesic_support(treeA::PhyloTree, treeB::PhyloTree; abstol::Real=0.0, reltol::Real=0.0)
-    data = geodesic_data(treeA, treeB)
-
-    out = refine_support(
-        data.c,
-        data.a,
-        data.b,
-        data.edgea,
-        data.edgeb,
-        data.inc;
-        abstol=abstol,
-        reltol=reltol,
-    )
-
-    return merge(data, out)
-end
-
-"""
-    geodesic_distance(treeA, treeB; abstol=0.0, reltol=0.0)
-
-Call `refine_support` and return the curve length together with the raw output.
-"""
-function geodesic_distance(treeA::PhyloTree, treeB::PhyloTree; abstol::Real=0.0, reltol::Real=0.0)
-    data = geodesic_data(treeA, treeB)
-
-    out = refine_support(
-        data.c,
-        data.a,
-        data.b,
-        data.edgea,
-        data.edgeb,
-        data.inc;
-        abstol=abstol,
-        reltol=reltol,
-    )
-
-    return out.curve_length, merge(data, out)
-end
-"""
-    refine_support(c, a, b, edgea, edgeb, inc; abstol=0.0, reltol=0.0)
-
-Refine one support pair into a support sequence, with early termination.
-
-In addition to the previous outputs, this version also returns
-
-- `mincut_sizes::Vector{Tuple{Int,Int}}`
-
-where each entry `(m,n)` records one min-cut problem that was actually solved
-during refinement, with `m = |A_i|`, `n = |B_i|` for the refined last pair.
-"""
 function refine_support(
-    c::Real,
-    a::AbstractVector{<:Real},
-    b::AbstractVector{<:Real},
-    edgea::AbstractVector,
-    edgeb::AbstractVector,
+    initial::SupportPair,
+    shared::SharedPair,
     inc::AbstractMatrix{Bool};
     abstol::Real=0.0,
-    reltol::Real=0.0,
-)
-    length(edgea) == length(a) || throw(ArgumentError("edgea must match a"))
-    length(edgeb) == length(b) || throw(ArgumentError("edgeb must match b"))
-    size(inc, 1) == length(a) || throw(ArgumentError("inc row size mismatch"))
-    size(inc, 2) == length(b) || throw(ArgumentError("inc col size mismatch"))
-    abstol >= 0 || throw(ArgumentError("abstol must be nonnegative"))
-    reltol >= 0 || throw(ArgumentError("reltol must be nonnegative"))
+    reltol::Real=0.0,)
 
-    # ------------------------------------------------------------
-    # Initial sort
-    # ------------------------------------------------------------
-    pa = sortperm(a; rev=true)
-    pb = sortperm(b; rev=true)
+    size(inc, 1) == length(initial.A) || throw(ArgumentError("inc row size mismatch"))
+    size(inc, 2) == length(initial.B) || throw(ArgumentError("inc col size mismatch"))
 
-    a1 = Float64.(a[pa])
-    b1 = Float64.(b[pb])
-    edgea1 = edgea[pa]
-    edgeb1 = edgeb[pb]
-    inc1 = inc[pa, pb]
-
-    idxA1 = collect(pa)
-    idxB1 = collect(pb)
-
-    # ------------------------------------------------------------
-    # Initial peel
-    # ------------------------------------------------------------
-    peeled = peel_fully_compatible(c, a1, b1, edgea1, edgeb1, inc1)
-    ccur = peeled.c
-
-    keepA = peeled.idx_a
-    keepB = peeled.idx_b
-
-    idxA2 = idxA1[keepA]
-    idxB2 = idxB1[keepB]
-
+    path = SupportPair[initial]
+    sqL_cur = _shared_sqdist(shared)
     mincut_sizes = Tuple{Int,Int}[]
 
-    # If peel resolves everything
-    if isempty(idxA2) || isempty(idxB2)
-        return (
-            supp_a=Vector{Vector{Int}}(),
-            supp_b=Vector{Vector{Int}}(),
-            curve_length=sqrt(ccur),
-            abstol=float(abstol),
-            reltol=float(reltol),
-            abserr=0.0,
-            relerr=0.0,
-            status=:resolved,
-            mincut_sizes=mincut_sizes,
-        )
-    end
-
-    # Support sequence stored in original indices.
-    supp_a = [collect(idxA2)]
-    supp_b = [collect(idxB2)]
-
-    sqL_cur = ccur
-    sqK_cur = 0.0
-
     while true
-        k = length(supp_a)
+        sp = path[end]
 
-        # Current last pair
-        idxA = supp_a[k]
-        idxB = supp_b[k]
+        if isempty(sp.A) || isempty(sp.B)
+            #pop!(path)
+            #return path, PathInfo(
+            #    sqrt(sqL_cur), :resolved, 0.0, 0.0,
+            #    float(abstol), float(reltol), mincut_sizes,
+            #)
+            throw("Error!")
+        end
 
-        ak = Float64.(a[idxA])
-        bk = Float64.(b[idxB])
+        ak = sp.WA
+        bk = sp.WB
 
-        # --------------------------------------------------------
-        # Current squared curve length
-        # --------------------------------------------------------
-        sqK_cur = (norm(ak) + norm(bk))^2
-        L2 = sqL_cur + sqK_cur
-
-        # --------------------------------------------------------
-        # Lower bound: fixed earlier pairs + best refinement of last
-        # --------------------------------------------------------
+        L2 = sqL_cur + (norm(ak) + norm(bk))^2
         LB2 = sqL_cur + phi_best_sorted(ak, bk)
 
         L = sqrt(L2)
@@ -230,156 +134,42 @@ function refine_support(
         abserr = L - LB
         relerr = iszero(LB) ? 0.0 : abserr / LB
 
-        # --------------------------------------------------------
-        # Early termination
-        # --------------------------------------------------------
         if abserr <= abstol || relerr <= reltol
-            return (
-                supp_a=[sort(copy(x)) for x in supp_a],
-                supp_b=[sort(copy(x)) for x in supp_b],
-                curve_length=L,
-                abstol=float(abstol),
-                reltol=float(reltol),
-                abserr=abserr,
-                relerr=relerr,
-                status=(abserr == 0 ? :exact : :tolerance),
-                mincut_sizes=mincut_sizes,
+            return path, PathInfo(
+                L, abserr == 0.0 ? :exact : :tolerance,
+                abserr, relerr,
+                float(abstol), float(reltol), mincut_sizes,
             )
         end
 
-        # --------------------------------------------------------
-        # Min-cut refinement on the last pair
-        # --------------------------------------------------------
-        # Record the size of the min-cut problem that is ACTUALLY solved
-        push!(mincut_sizes, (length(idxA), length(idxB)))
+        push!(mincut_sizes, (length(sp.A), length(sp.B)))
 
-        inck = inc[idxA, idxB]
+        inck = falses(length(sp.A), length(sp.B))
+        for i in eachindex(sp.A), j in eachindex(sp.B)
+            inck[i, j] = inc[
+                findfirst(==(sp.A[i]), initial.A),
+                findfirst(==(sp.B[j]), initial.B)
+            ]
+        end
+
         out = refine_pair_mincut(ak, bk, inck)
 
-        # Mathematical convention:
-        #   refine iff cut_value < 1
-        #   terminate iff cut_value >= 1
         if out.cut_value >= 1.0 - 1e-12
-            return (
-                supp_a=[sort(copy(x)) for x in supp_a],
-                supp_b=[sort(copy(x)) for x in supp_b],
-                curve_length=L,
-                abstol=float(abstol),
-                reltol=float(reltol),
-                abserr=0.0,
-                relerr=0.0,
-                status=:exact,
-                mincut_sizes=mincut_sizes,
+            return path, PathInfo(
+                L, :exact, 0.0, 0.0,
+                float(abstol), float(reltol), mincut_sizes,
             )
         end
 
-        # Split last pair:
-        #   A = R ∪ S,  B = U ∪ V
-        Rorig = collect(idxA[out.Ridx])
-        Sorig = collect(idxA[out.Sidx])
-        Uorig = collect(idxB[out.Uidx])
-        Vorig = collect(idxB[out.Vidx])
+        R = SupportPair(sp.A[out.Ridx], sp.WA[out.Ridx], sp.B[out.Uidx], sp.WB[out.Uidx])
+        S = SupportPair(sp.A[out.Sidx], sp.WA[out.Sidx], sp.B[out.Vidx], sp.WB[out.Vidx])
 
-        supp_a[end] = Rorig
-        supp_b[end] = Uorig
-        push!(supp_a, Sorig)
-        push!(supp_b, Vorig)
+        pop!(path)
+        push!(path, R)
+        push!(path, S)
 
-        sqL_cur += (norm(a[Rorig]) + norm(b[Uorig]))^2
+        sqL_cur += (norm(R.WA) + norm(R.WB))^2
     end
-end
-
-"""
-    peel_fully_compatible(c, a, b, edgea, edgeb, inc)
-
-Peel off bipartitions that are compatible with all bipartitions on the other side.
-
-If a peeled bipartition occurs on both sides, say with weights a[i] and b[j],
-then its contribution to `c` is (a[i] - b[j])^2.
-
-If it occurs only on one side, its contribution is just the squared weight.
-
-Inputs
-------
-- `c      :: Real`
-- `a      :: AbstractVector{<:Real}`   sorted weights on A-side
-- `b      :: AbstractVector{<:Real}`   sorted weights on B-side
-- `edgea  :: AbstractVector`           bipartition/edge labels for `a`
-- `edgeb  :: AbstractVector`           bipartition/edge labels for `b`
-- `inc    :: AbstractMatrix{Bool}`     incompatibility matrix:
-                                       inc[i,j] = true means edgea[i] incompatible with edgeb[j]
-
-Returns
--------
-A named tuple with fields
-
-- `c`
-- `idx_a`
-- `idx_b`
-
-where `idx_a`, `idx_b` are the remaining indices in increasing order.
-"""
-function peel_fully_compatible(c::Real, a::AbstractVector{Ta}, b::AbstractVector{Tb}, edgea::AbstractVector, edgeb::AbstractVector, inc::AbstractMatrix{Bool}) where {Ta<:Real,Tb<:Real}
-
-    M = length(a)
-    N = length(b)
-
-    length(edgea) == M || throw(ArgumentError("edgea must have same length as a"))
-    length(edgeb) == N || throw(ArgumentError("edgeb must have same length as b"))
-    size(inc, 1) == M || throw(ArgumentError("inc has wrong number of rows"))
-    size(inc, 2) == N || throw(ArgumentError("inc has wrong number of columns"))
-
-    # Compatible with everything on the other side
-    peel_a = [!any(@view inc[i, :]) for i in 1:M]
-    peel_b = [!any(@view inc[:, j]) for j in 1:N]
-
-    c_new = float(c)
-
-    removed_a = falses(M)
-    removed_b = falses(N)
-
-    # Match peeled identical bipartitions first
-    b_lookup = Dict{Any,Int}()
-    for j in 1:N
-        if peel_b[j]
-            b_lookup[edgeb[j]] = j
-        end
-    end
-
-    for i in 1:M
-        if peel_a[i]
-            key = edgea[i]
-            if haskey(b_lookup, key)
-                j = b_lookup[key]
-                if !removed_b[j]
-                    c_new += (a[i] - b[j])^2
-                    removed_a[i] = true
-                    removed_b[j] = true
-                end
-            end
-        end
-    end
-
-    # Unmatched peeled entries on A-side
-    for i in 1:M
-        if peel_a[i] && !removed_a[i]
-            c_new += a[i]^2
-            removed_a[i] = true
-        end
-    end
-
-    # Unmatched peeled entries on B-side
-    for j in 1:N
-        if peel_b[j] && !removed_b[j]
-            c_new += b[j]^2
-            removed_b[j] = true
-        end
-    end
-
-    idx_a = findall(!, removed_a)
-    idx_b = findall(!, removed_b)
-
-    return (c=c_new, idx_a=idx_a, idx_b=idx_b)
 end
 
 """
@@ -609,75 +399,38 @@ function phi_best_sorted(a::AbstractVector{T}, b::AbstractVector{T}) where {T<:R
     end
 end
 
+
 function geodesic_tree_at(
-    t::Real,
-    supp_pairs,
-    edgea::AbstractVector{Bipart},
-    edgeb::AbstractVector{Bipart},
-    a::AbstractVector{<:Real},
-    b::AbstractVector{<:Real};
-    common::AbstractVector{Bipart}=Bipart[],
-    common_wa::Dict{Bipart,Float64}=Dict(),
-    common_wb::Dict{Bipart,Float64}=Dict(), 
-    atol::Real=0.0,
-)
-    t = Float64(t)
-    w = Dict{Bipart,Float64}()
+    path::Vector{SupportPair},
+    shared::SharedPair,
+    t::Real;
+    atol::Float64=1e-12,)
 
-    for (Aidx, Bidx) in supp_pairs
-        an = sqrt(sum(a[k]^2 for k in Aidx))
-        bn = sqrt(sum(b[k]^2 for k in Bidx))
+    K = length(path)
+    τ = clamp(float(t), 0.0, 1.0)
+    W = Dict{Bipart,Float64}()
 
-        α = an == 0 ? 0.0 : (1 - t) - t * bn / an
-        β = bn == 0 ? 0.0 : t - (1 - t) * an / bn
+    for (k, sp) in enumerate(path)
+        tk = k / (K + 1)
 
-        if α > atol
-            for k in Aidx
-                val = α * a[k]
-                val > atol && (w[edgea[k]] = val)
-            end
+        α = τ <= tk ? 1.0 - τ / tk : 0.0
+        β = τ >= tk ? (τ - tk) / (1.0 - tk) : 0.0
+
+        for (e, w) in zip(sp.A, sp.WA)
+            ew = α * w
+            ew > atol && (W[e] = ew)
         end
 
-        if β > atol
-            for k in Bidx
-                val = β * b[k]
-                val > atol && (w[edgeb[k]] = val)
-            end
+        for (e, w) in zip(sp.B, sp.WB)
+            ew = β * w
+            ew > atol && (W[e] = ew)
         end
     end
 
-    for e in common
-        if common_wa === nothing || common_wb === nothing
-            w[e] = get(w, e, 1.0)
-        else
-            w[e] = (1-t) * common_wa[e] + t * common_wb[e]
-        end
+    for (e, w0, w1) in zip(shared.C, shared.W0, shared.W1)
+        ew = (1.0 - τ) * w0 + τ * w1
+        ew > atol && (W[e] = ew)
     end
 
-    active_biparts = collect(keys(w))
-    return active_biparts, w
-end
-
-function geodesic_tree_at(t::Real, data, supp_pairs; atol::Real=0.0)
-    common =
-        data.common isa AbstractVector{Bipart} ? data.common : Bipart[]
-
-    common_wa =
-        data.common_wa isa Dict{Bipart,Float64} ? data.common_wa : Dict()
-
-    common_wb =
-        data.common_wb isa Dict{Bipart,Float64} ? data.common_wa : Dict()
-
-    return geodesic_tree_at(
-        t,
-        supp_pairs,
-        data.edgea,
-        data.edgeb,
-        data.a,
-        data.b;
-        common = common,
-        common_wa = common_wa,
-        common_wb = common_wb,
-        atol = atol,
-    )
+    return W
 end
