@@ -4,70 +4,6 @@ include("treeObj.jl")
 include("bipartComp.jl")
 
 
-pyplot()
-# plotlyjs()
-
-_cov_max(x, y) = min(x, y) - x*y
-_cov_min(x, y) = max(0, x+y-1) - x*y
-
-_cov_max_same(x) = _cov_max(x, x)
-_cov_min_same(x) = _cov_min(x, x)
-
-function plot2d_curves_with_region(f, g, plot_title)
-    # Create x values
-    x = LinRange(0, 1, 100)
-
-    # Compute y values for both functions
-    y_f = f.(x)
-    y_g = g.(x)
-
-    # Create the plot
-    p = plot(x, y_f, label="Maximum", linewidth=2, color=:blue)
-    plot!(x, y_g, label="Minimum", linewidth=2, color=:red)
-
-    # Color the region between the curves
-    fillrange = min.(y_f, y_g)
-    plot!(x, y_f, fillrange=fillrange, fillalpha=0.3, label="Possible values", color=:gray)
-
-    # Set the plot labels and title
-    xlabel!("Frequency "*L"f_x = f_y = p")
-    ylabel!("Covariance "*L"f_{x, y} - f_x \cdot f_y")
-    title!(plot_title)
-
-    return p
-end
-
-
-function plot3d_surfaces_with_region(f, g, plot_title; pts = 200)
-    # Define the grid for x and y
-    x = LinRange(0, 1, pts)
-    y = LinRange(0, 1, pts)
-    
-    # Generate the meshgrid
-    X, Y = [x[i] for i in 1:length(x), j in 1:length(y)], [y[j] for i in 1:length(x), j in 1:length(y)]
-
-    # Compute function values
-    Z_f = f.(X, Y)
-    Z_g = g.(X, Y)
-
-    # Create the plot
-    p = surface(X, Y, Z_g, label="Minimum",fillalpha = 0.5)  # Semi-transparent surface
-    surface!(X, Y, Z_f, label="Maximum",fillalpha = 0.5)  # Semi-transparent surface
-
-    # Fill the region between using a transparent middle surface
-    #Z_fill = min.(Z_f, Z_g)  # The lowest boundary
-    #surface!(X, Y, Z_fill, label="Possible values", color=:gray, alpha=0.3)
-
-    # Set labels and title
-    xlabel!(L"f_x")
-    ylabel!(L"f_y")
-    zlabel!("Covariance Range")
-    title!(plot_title)
-
-    return p
-end
-
-
 struct GraphTreeEdge
     label::BITSTR_TYPE
     weight::Float64
@@ -80,6 +16,7 @@ struct GraphTree
     right::GraphTreeEdge
     GraphTree(l, r) = new(l, r)
 end
+
 
 function _build_weight_map(tree::PhyloTree)
     weights::Dict{BITSTR_TYPE, Float64} = Dict{BITSTR_TYPE, Float64}()
@@ -229,6 +166,73 @@ Compute_GraphTree(tree::PhyloTree, leaf::BITSTR_TYPE) = Compute_GraphTree(_balan
 
 Compute_GraphTree(VecBipart::Vector{Bipart}) = Compute_GraphTree(_balance_bipartition(VecBipart), VecBipart)
 
+
+
+pyplot()
+# plotlyjs()
+
+_cov_max(x, y) = min(x, y) - x*y
+_cov_min(x, y) = max(0, x+y-1) - x*y
+
+_cov_max_same(x) = _cov_max(x, x)
+_cov_min_same(x) = _cov_min(x, x)
+
+function plot2d_curves_with_region(f, g, plot_title)
+    # Create x values
+    x = LinRange(0, 1, 100)
+
+    # Compute y values for both functions
+    y_f = f.(x)
+    y_g = g.(x)
+
+    # Create the plot
+    p = plot(x, y_f, label="Maximum", linewidth=2, color=:blue)
+    plot!(x, y_g, label="Minimum", linewidth=2, color=:red)
+
+    # Color the region between the curves
+    fillrange = min.(y_f, y_g)
+    plot!(x, y_f, fillrange=fillrange, fillalpha=0.3, label="Possible values", color=:gray)
+
+    # Set the plot labels and title
+    xlabel!("Frequency "*L"f_x = f_y = p")
+    ylabel!("Covariance "*L"f_{x, y} - f_x \cdot f_y")
+    title!(plot_title)
+
+    return p
+end
+
+
+function plot3d_surfaces_with_region(f, g, plot_title; pts = 200)
+    # Define the grid for x and y
+    x = LinRange(0, 1, pts)
+    y = LinRange(0, 1, pts)
+    
+    # Generate the meshgrid
+    X, Y = [x[i] for i in 1:length(x), j in 1:length(y)], [y[j] for i in 1:length(x), j in 1:length(y)]
+
+    # Compute function values
+    Z_f = f.(X, Y)
+    Z_g = g.(X, Y)
+
+    # Create the plot
+    p = surface(X, Y, Z_g, label="Minimum",fillalpha = 0.5)  # Semi-transparent surface
+    surface!(X, Y, Z_f, label="Maximum",fillalpha = 0.5)  # Semi-transparent surface
+
+    # Fill the region between using a transparent middle surface
+    #Z_fill = min.(Z_f, Z_g)  # The lowest boundary
+    #surface!(X, Y, Z_fill, label="Possible values", color=:gray, alpha=0.3)
+
+    # Set labels and title
+    xlabel!(L"f_x")
+    ylabel!(L"f_y")
+    zlabel!("Covariance Range")
+    title!(plot_title)
+
+    return p
+end
+
+
+
 # leafset = BITSTR_TYPE(31)
 # biparts = [Bipart(BITSTR_TYPE(5), leafset), Bipart(BITSTR_TYPE(7), leafset)]
 # innerws = [0.5,0.8]
@@ -263,69 +267,142 @@ end
 
 _draw_tree_polar_coordinate(radius::Float64, theta::Float64) = radius * cos(theta), radius * sin(theta)
 
-function _draw_tree(canvas, curr_pos::Tuple{Float64, Float64}, edge::GraphTreeEdge, radius_level::Float64, theta_lb::Float64, theta_ub::Float64;
-    color_map = Dict{BITSTR_TYPE, Symbol}(), weight_map::Function = (x -> 1.0))
+# function _draw_tree(canvas, curr_pos::Tuple{Float64, Float64}, edge::GraphTreeEdge, radius_level::Float64, theta_lb::Float64, theta_ub::Float64;
+#     color_map = Dict{BITSTR_TYPE, Symbol}(), weight_map::Function = (x -> 1.0))
+#     leaf_cnt = count_ones(edge.label)
+
+#     tlb = theta_lb
+#     tub = theta_ub
+
+#     tlevel = (tub - tlb) / leaf_cnt
+
+#     # println("Current point: ($(curr_pos[1]), $(curr_pos[2])), \tAngles Range: $(tlb)~$(tlevel)~$(tub)")
+
+#     # display(edge.outter)
+
+#     for e in edge.outter
+#         if count_ones(e.label) == 1
+#             pt = _draw_tree_polar_coordinate(1.0, tlb + tlevel / 2)
+#             scatter!(pt)
+
+#             # display(pt)
+
+#             plot!([curr_pos[1], pt[1]], [curr_pos[2], pt[2]], linewidth = weight_map(e.weight), color=color=get(color_map, e.label, :black))
+#             tlb += tlevel
+#         else
+#             cnt = count_ones(e.label)
+#             depth = _draw_tree_depth(e)
+#             pt = _draw_tree_polar_coordinate(1.0 - radius_level * depth, tlb + cnt * tlevel / 2)
+#             # display((depth, 1.0 - radius_level * depth, pt))
+#             scatter!(pt)
+#             plot!([curr_pos[1], pt[1]], [curr_pos[2], pt[2]], linewidth = weight_map(e.weight), color=color=get(color_map, e.label, :black))
+#             canvas = _draw_tree(canvas, pt, e, radius_level, tlb, tlb + cnt * tlevel; weight_map = weight_map, color_map = color_map)
+#             tlb += cnt * tlevel
+#         end
+#     end
+
+#     return canvas
+# end
+
+# function draw_tree(gt::GraphTree; color_map = Dict{BITSTR_TYPE, Symbol}(), weight_map::Function = (x -> 1.0))
+#     canvas = plot(size=(800,800), 
+#         xlims=(-1.1,1.1), ylims=(-1.1, 1.1), 
+#         framestyle=:none,
+#         legend=:none,
+#         aspect_ratio=1
+#     )
+
+#     left_depth = _draw_tree_depth(gt.left)
+#     left_rad_level = 1.0 / (left_depth + 1)
+#     left_pos = _draw_tree_polar_coordinate(left_rad_level, 1.0π)
+#     # display((left_depth, left_rad_level, left_pos))
+#     scatter!(left_pos)
+#     if left_depth != 0
+#         canvas = _draw_tree(canvas, left_pos, gt.left, left_rad_level, 0.6π, 1.4π; color_map = color_map, weight_map = weight_map)
+#     end
+
+#     right_depth = _draw_tree_depth(gt.right)
+#     right_rad_level = 1.0 / (right_depth + 1)
+#     right_pos = _draw_tree_polar_coordinate(right_rad_level, 0.0)
+#     # display((right_depth, right_rad_level, right_pos))
+#     scatter!(right_pos)
+#     if right_depth != 0
+#         canvas = _draw_tree(canvas, right_pos, gt.right, right_rad_level, -0.4π, 0.4π; color_map = color_map, weight_map = weight_map)
+#     end
+#     plot!([left_pos[1], right_pos[1]], [left_pos[2], right_pos[2]], linewidth = weight_map(gt.left.weight), color=get(color_map, gt.left.label, :black))
+#     return canvas
+# end
+
+function _draw_tree(
+    canvas,
+    curr_pos::Tuple{Float64, Float64},
+    edge::GraphTreeEdge,
+    theta_lb::Float64,
+    theta_ub::Float64;
+    color_map = Dict{BITSTR_TYPE, Symbol}(),
+    weight_map::Function = (x -> 1.0)
+)
     leaf_cnt = count_ones(edge.label)
 
     tlb = theta_lb
     tub = theta_ub
-
     tlevel = (tub - tlb) / leaf_cnt
 
-    # println("Current point: ($(curr_pos[1]), $(curr_pos[2])), \tAngles Range: $(tlb)~$(tlevel)~$(tub)")
+    r_parent = sqrt(curr_pos[1]^2 + curr_pos[2]^2)
 
-    # display(edge.outter)
+    # Sort children by number of leaves, so leaves come first.
+    children = sort(edge.outter, by = e -> count_ones(e.label))
 
-    for e in edge.outter
-        if count_ones(e.label) == 1
-            pt = _draw_tree_polar_coordinate(1.0, tlb + tlevel / 2)
+    for e in children
+        cnt = count_ones(e.label)
+
+        if cnt == 1
+            θ = tlb + tlevel / 2
+            pt = _draw_tree_polar_coordinate(1.0, θ)
             scatter!(pt)
 
-            # display(pt)
+            plot!(
+                [curr_pos[1], pt[1]],
+                [curr_pos[2], pt[2]],
+                # linewidth = weight_map(e.weight),
+                color = get(color_map, e.label, :black)
+            )
 
-            plot!([curr_pos[1], pt[1]], [curr_pos[2], pt[2]], linewidth = weight_map(e.weight), color=color=get(color_map, e.label, :black))
             tlb += tlevel
         else
-            cnt = count_ones(e.label)
+            θ = tlb + cnt * tlevel / 2
+
             depth = _draw_tree_depth(e)
-            pt = _draw_tree_polar_coordinate(1.0 - radius_level * depth, tlb + cnt * tlevel / 2)
-            # display((depth, 1.0 - radius_level * depth, pt))
+
+            # New weighted recursive radial rule:
+            # if e.weight = 1, this gives the old one-layer outward move.
+            Δr = (1.0 - r_parent) / (depth + 1)
+            r_child = r_parent + e.weight * Δr
+
+            pt = _draw_tree_polar_coordinate(r_child, θ)
             scatter!(pt)
-            plot!([curr_pos[1], pt[1]], [curr_pos[2], pt[2]], linewidth = weight_map(e.weight), color=color=get(color_map, e.label, :black))
-            canvas = _draw_tree(canvas, pt, e, radius_level, tlb, tlb + cnt * tlevel; weight_map = weight_map, color_map = color_map)
+
+            plot!(
+                [curr_pos[1], pt[1]],
+                [curr_pos[2], pt[2]],
+                # linewidth = weight_map(e.weight),
+                color = get(color_map, e.label, :black)
+            )
+
+            canvas = _draw_tree(
+                canvas,
+                pt,
+                e,
+                tlb,
+                tlb + cnt * tlevel;
+                weight_map = weight_map,
+                color_map = color_map
+            )
+
             tlb += cnt * tlevel
         end
     end
 
-    return canvas
-end
-
-function draw_tree(gt::GraphTree; color_map = Dict{BITSTR_TYPE, Symbol}(), weight_map::Function = (x -> 1.0))
-    canvas = plot(size=(800,800), 
-        xlims=(-1.1,1.1), ylims=(-1.1, 1.1), 
-        framestyle=:none,
-        legend=:none,
-        aspect_ratio=1
-    )
-
-    left_depth = _draw_tree_depth(gt.left)
-    left_rad_level = 1.0 / (left_depth + 1)
-    left_pos = _draw_tree_polar_coordinate(left_rad_level, 1.0π)
-    # display((left_depth, left_rad_level, left_pos))
-    scatter!(left_pos)
-    if left_depth != 0
-        canvas = _draw_tree(canvas, left_pos, gt.left, left_rad_level, 0.6π, 1.4π; color_map = color_map, weight_map = weight_map)
-    end
-
-    right_depth = _draw_tree_depth(gt.right)
-    right_rad_level = 1.0 / (right_depth + 1)
-    right_pos = _draw_tree_polar_coordinate(right_rad_level, 0.0)
-    # display((right_depth, right_rad_level, right_pos))
-    scatter!(right_pos)
-    if right_depth != 0
-        canvas = _draw_tree(canvas, right_pos, gt.right, right_rad_level, -0.4π, 0.4π; color_map = color_map, weight_map = weight_map)
-    end
-    plot!([left_pos[1], right_pos[1]], [left_pos[2], right_pos[2]], linewidth = weight_map(gt.left.weight), color=get(color_map, gt.left.label, :black))
     return canvas
 end
 
@@ -361,22 +438,58 @@ function draw_tree(VecBipart::Vector{Bipart}; color_map = Dict{BITSTR_TYPE, Symb
         aspect_ratio=1
     )
 
+    w_root = gt.left.weight
+
     left_depth = _draw_tree_depth(gt.left)
-    left_rad_level = 1.0 / (left_depth + 1)
+    left_rad_level = w_root / (left_depth + 1)
     left_pos = _draw_tree_polar_coordinate(left_rad_level, 1.0π)
     # display((left_depth, left_rad_level, left_pos))
     scatter!(left_pos)
     if left_depth != 0
-        canvas = _draw_tree(canvas, left_pos, gt.left, left_rad_level, 0.5π, 1.5π; color_map = color_map, weight_map = weight_map)
+        canvas = _draw_tree(canvas, left_pos, gt.left, 0.5π, 1.5π; color_map = color_map, weight_map = weight_map)
     end
 
     right_depth = _draw_tree_depth(gt.right)
-    right_rad_level = 1.0 / (right_depth + 1)
+    right_rad_level = w_root / (right_depth + 1)
     right_pos = _draw_tree_polar_coordinate(right_rad_level, 0.0)
     # display((right_depth, right_rad_level, right_pos))
     scatter!(right_pos)
     if right_depth != 0
-        canvas = _draw_tree(canvas, right_pos, gt.right, right_rad_level, -0.5π, 0.5π; color_map = color_map, weight_map = weight_map)
+        canvas = _draw_tree(canvas, right_pos, gt.right, -0.5π, 0.5π; color_map = color_map, weight_map = weight_map)
+    end
+    plot!([left_pos[1], right_pos[1]], [left_pos[2], right_pos[2]],  linewidth = weight_map(gt.left.weight), color=get(color_map, gt.left.label, :black))
+    return canvas
+end
+
+
+function draw_tree(VecBipart::Vector{Bipart}, Weights::Dict{Bipart, Float64}; color_map = Dict{BITSTR_TYPE, Symbol}(), weight_map::Function = (x -> 1.0))
+    gt = Compute_GraphTree(VecBipart)
+    
+    canvas = plot(size=(800,800), 
+        xlims=(-1.1,1.1), ylims=(-1.1, 1.1), 
+        framestyle=:none,
+        legend=:none,
+        aspect_ratio=1
+    )
+
+    w_root = gt.left.weight
+
+    left_depth = _draw_tree_depth(gt.left)
+    left_rad_level = w_root / (left_depth + 1)
+    left_pos = _draw_tree_polar_coordinate(left_rad_level, 1.0π)
+    # display((left_depth, left_rad_level, left_pos))
+    scatter!(left_pos)
+    if left_depth != 0
+        canvas = _draw_tree(canvas, left_pos, gt.left, 0.5π, 1.5π; color_map = color_map, weight_map = weight_map)
+    end
+
+    right_depth = _draw_tree_depth(gt.right)
+    right_rad_level = w_root / (right_depth + 1)
+    right_pos = _draw_tree_polar_coordinate(right_rad_level, 0.0)
+    # display((right_depth, right_rad_level, right_pos))
+    scatter!(right_pos)
+    if right_depth != 0
+        canvas = _draw_tree(canvas, right_pos, gt.right, -0.5π, 0.5π; color_map = color_map, weight_map = weight_map)
     end
     plot!([left_pos[1], right_pos[1]], [left_pos[2], right_pos[2]],  linewidth = weight_map(gt.left.weight), color=get(color_map, gt.left.label, :black))
     return canvas

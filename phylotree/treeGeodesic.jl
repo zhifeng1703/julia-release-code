@@ -21,47 +21,56 @@ Returns a named tuple with fields
 - `inc`    : incompatibility matrix between `edgea` and `edgeb`
 """
 function geodesic_data(treeA::PhyloTree, treeB::PhyloTree)
-    # lookup for exact common bipartitions
     mapA = Dict{Bipart,Float64}(treeA.ib[i] => treeA.iw[i] for i in eachindex(treeA.ib))
     mapB = Dict{Bipart,Float64}(treeB.ib[i] => treeB.iw[i] for i in eachindex(treeB.ib))
 
-    common = intersect(Set(treeA.ib), Set(treeB.ib))
+    common_set = intersect(Set(treeA.ib), Set(treeB.ib))
+    common = collect(common_set)
 
-    # squared contribution from common edges
+    common_wa = Dict{Bipart,Float64}(e => mapA[e] for e in common)
+    common_wb = Dict{Bipart,Float64}(e => mapB[e] for e in common)
+
     c = 0.0
     for e in common
-        c += (mapA[e] - mapB[e])^2
+        c += (common_wa[e] - common_wb[e])^2
     end
 
-    # edges unique to A
     edgea = Bipart[]
     a = Float64[]
     for i in eachindex(treeA.ib)
         e = treeA.ib[i]
-        if !(e in common)
+        if !(e in common_set)
             push!(edgea, e)
             push!(a, treeA.iw[i])
         end
     end
 
-    # edges unique to B
     edgeb = Bipart[]
     b = Float64[]
     for j in eachindex(treeB.ib)
         e = treeB.ib[j]
-        if !(e in common)
+        if !(e in common_set)
             push!(edgeb, e)
             push!(b, treeB.iw[j])
         end
     end
 
-    # incompatibility matrix
     inc = falses(length(edgea), length(edgeb))
     for i in eachindex(edgea), j in eachindex(edgeb)
         inc[i, j] = !_bipart_comp(edgea[i], edgeb[j])
     end
 
-    return (c=c, a=a, b=b, edgea=edgea, edgeb=edgeb, inc=inc)
+    return (
+        c = c,
+        a = a,
+        b = b,
+        edgea = edgea,
+        edgeb = edgeb,
+        inc = inc,
+        common = common,
+        common_wa = common_wa,
+        common_wb = common_wb,
+    )
 end
 
 
@@ -598,4 +607,77 @@ function phi_best_sorted(a::AbstractVector{T}, b::AbstractVector{T}) where {T<:R
         end
         return val
     end
+end
+
+function geodesic_tree_at(
+    t::Real,
+    supp_pairs,
+    edgea::AbstractVector{Bipart},
+    edgeb::AbstractVector{Bipart},
+    a::AbstractVector{<:Real},
+    b::AbstractVector{<:Real};
+    common::AbstractVector{Bipart}=Bipart[],
+    common_wa::Dict{Bipart,Float64}=Dict(),
+    common_wb::Dict{Bipart,Float64}=Dict(), 
+    atol::Real=0.0,
+)
+    t = Float64(t)
+    w = Dict{Bipart,Float64}()
+
+    for (Aidx, Bidx) in supp_pairs
+        an = sqrt(sum(a[k]^2 for k in Aidx))
+        bn = sqrt(sum(b[k]^2 for k in Bidx))
+
+        α = an == 0 ? 0.0 : (1 - t) - t * bn / an
+        β = bn == 0 ? 0.0 : t - (1 - t) * an / bn
+
+        if α > atol
+            for k in Aidx
+                val = α * a[k]
+                val > atol && (w[edgea[k]] = val)
+            end
+        end
+
+        if β > atol
+            for k in Bidx
+                val = β * b[k]
+                val > atol && (w[edgeb[k]] = val)
+            end
+        end
+    end
+
+    for e in common
+        if common_wa === nothing || common_wb === nothing
+            w[e] = get(w, e, 1.0)
+        else
+            w[e] = (1-t) * common_wa[e] + t * common_wb[e]
+        end
+    end
+
+    active_biparts = collect(keys(w))
+    return active_biparts, w
+end
+
+function geodesic_tree_at(t::Real, data, supp_pairs; atol::Real=0.0)
+    common =
+        data.common isa AbstractVector{Bipart} ? data.common : Bipart[]
+
+    common_wa =
+        data.common_wa isa Dict{Bipart,Float64} ? data.common_wa : Dict()
+
+    common_wb =
+        data.common_wb isa Dict{Bipart,Float64} ? data.common_wa : Dict()
+
+    return geodesic_tree_at(
+        t,
+        supp_pairs,
+        data.edgea,
+        data.edgeb,
+        data.a,
+        data.b;
+        common = common,
+        common_wa = common_wa,
+        common_wb = common_wb,
+        atol = atol,
+    )
 end
