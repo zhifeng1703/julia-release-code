@@ -33,12 +33,32 @@ function _shared_sqdist(shared::SharedPair)
     return sum((shared.W0[i] - shared.W1[i])^2 for i in eachindex(shared.C))
 end
 
-function geodesic_initial(treeA::PhyloTree, treeB::PhyloTree)
-    mapA = Dict{Bipart,Float64}(treeA.ib[i] => treeA.iw[i] for i in eachindex(treeA.ib))
-    mapB = Dict{Bipart,Float64}(treeB.ib[i] => treeB.iw[i] for i in eachindex(treeB.ib))
+function _leaf_biparts(n::Int)
+    leaf = n == BITSTR_SIZE ? typemax(BITSTR_TYPE) : (BITSTR_TYPE(1) << n) - 1
+    return [Bipart(BITSTR_TYPE(1) << (i - 1), leaf) for i in 1:n]
+end
 
-    allA = collect(treeA.ib)
-    allB = collect(treeB.ib)
+function geodesic_initial(treeA::PhyloTree, treeB::PhyloTree)
+    length(treeA.lw) == length(treeB.lw) || throw(ArgumentError("leaf weight size mismatch"))
+
+    leaf_edges = _leaf_biparts(length(treeA.lw))
+
+    mapA = Dict{Bipart,Float64}()
+    mapB = Dict{Bipart,Float64}()
+
+    for i in eachindex(treeA.ib)
+        mapA[treeA.ib[i]] = treeA.iw[i]
+    end
+    for i in eachindex(treeB.ib)
+        mapB[treeB.ib[i]] = treeB.iw[i]
+    end
+    for i in eachindex(leaf_edges)
+        mapA[leaf_edges[i]] = treeA.lw[i]
+        mapB[leaf_edges[i]] = treeB.lw[i]
+    end
+
+    allA = collect(keys(mapA))
+    allB = collect(keys(mapB))
 
     common_set = Set{Bipart}()
 
@@ -81,10 +101,8 @@ function geodesic_initial(treeA::PhyloTree, treeB::PhyloTree)
     pa = sortperm(WA; rev=true)
     pb = sortperm(WB; rev=true)
 
-    A = A[pa]
-    WA = WA[pa]
-    B = B[pb]
-    WB = WB[pb]
+    A, WA = A[pa], WA[pa]
+    B, WB = B[pb], WB[pb]
 
     initial = SupportPair(A, WA, B, WB)
 
@@ -114,11 +132,11 @@ function refine_support(
         sp = path[end]
 
         if isempty(sp.A) || isempty(sp.B)
-            #pop!(path)
-            #return path, PathInfo(
-            #    sqrt(sqL_cur), :resolved, 0.0, 0.0,
-            #    float(abstol), float(reltol), mincut_sizes,
-            #)
+            pop!(path)
+            return path, PathInfo(
+               sqrt(sqL_cur), :resolved, 0.0, 0.0,
+               float(abstol), float(reltol), mincut_sizes,
+            )
             throw("Error!")
         end
 
@@ -404,7 +422,7 @@ function geodesic_tree_at(
     path::Vector{SupportPair},
     shared::SharedPair,
     t::Real;
-    atol::Float64=1e-12,)
+    atol::Float64=1e-16,)
 
     K = length(path)
     τ = clamp(float(t), 0.0, 1.0)

@@ -103,6 +103,43 @@ function _depth(gt::Dict{Bipart,GraphTree}, e::Bipart, p::Bipart)
     return 1 + maximum(_depth(gt, c, e) for c in cs)
 end
 
+# function _draw_branch!(plt, gt, cs, p0, x0, y0, a, b,
+#     weights, colors, default_length, gap_ratio)
+
+#     isempty(cs) && return
+
+#     sort!(cs, by=e -> (_depth(gt, e, p0), _leafcount(gt, e, p0), e.lower, e.upper))
+
+#     nleaf = [_leafcount(gt, e, p0) for e in cs]
+#     total = sum(nleaf)
+
+#     δ = gap_ratio * abs(b - a)
+#     s = sign(b - a)
+#     aa = a + s * δ
+#     bb = b - s * δ
+
+#     r0 = hypot(x0, y0)
+#     acc = 0
+
+#     for (e, J) in zip(cs, nleaf)
+#         t0 = aa + (acc / total) * (bb - aa)
+#         t1 = aa + ((acc + J) / total) * (bb - aa)
+#         t = (t0 + t1) / 2
+
+#         l = default_length * _getw(weights, e)
+#         x1 = (r0 + l) * cos(t)
+#         y1 = (r0 + l) * sin(t)
+
+#         plot!(plt, [x0, x1], [y0, y1], color=_getc(colors, e), lw=2)
+
+#         next_cs = [x for x in union(gt[e].rside, gt[e].lside) if x != p0]
+#         _draw_branch!(plt, gt, next_cs, e, x1, y1, t0, t1,
+#             weights, colors, default_length, gap_ratio)
+
+#         acc += J
+#     end
+# end
+
 function _draw_branch!(plt, gt, cs, p0, x0, y0, a, b,
     weights, colors, default_length, gap_ratio)
 
@@ -118,7 +155,6 @@ function _draw_branch!(plt, gt, cs, p0, x0, y0, a, b,
     aa = a + s * δ
     bb = b - s * δ
 
-    r0 = hypot(x0, y0)
     acc = 0
 
     for (e, J) in zip(cs, nleaf)
@@ -127,8 +163,9 @@ function _draw_branch!(plt, gt, cs, p0, x0, y0, a, b,
         t = (t0 + t1) / 2
 
         l = default_length * _getw(weights, e)
-        x1 = (r0 + l) * cos(t)
-        y1 = (r0 + l) * sin(t)
+
+        x1 = x0 + l * cos(t)
+        y1 = y0 + l * sin(t)
 
         plot!(plt, [x0, x1], [y0, y1], color=_getc(colors, e), lw=2)
 
@@ -146,8 +183,9 @@ function draw_tree(
     weights::Dict{Bipart,Float64}=Dict{Bipart,Float64}(),
     colors::Dict{Bipart,Colorant}=Dict{Bipart,Colorant}(),
     default_length::Float64=1.0,
-    gap_ratio::Float64=0.05,
-    size=(800, 800),)
+    gap_ratio::Float64=0.1,
+    size=(800, 800),
+    depth=1,)
 
     root = gt[root].bipart
     lroot = default_length * _getw(weights, root)
@@ -157,8 +195,8 @@ function draw_tree(
 
     plt = plot(
         size=size,
-        xlims=(-1.1, 1.1),
-        ylims=(-1.1, 1.1),
+        xlims=(-1.1*depth, 1.1*depth),
+        ylims=(-1.1*depth, 1.1*depth),
         framestyle=:none,
         legend=:none,
         aspect_ratio=1,
@@ -241,10 +279,12 @@ function plot_support_path(
         )
     end
 
+    shared_norm = [norm(shared.W0), norm(shared.W1)];
+    shared_norm .-= minimum(shared_norm);
     plot!(
         plt,
         [0, 1],
-        [norm(shared.W0), norm(shared.W1)],
+        shared_norm,
         color=colorant"black",
         lw=lw,
         label="C",
@@ -331,5 +371,101 @@ function test_draw_graphtree()
     display(plt)
 end
 
+function best_common_root(Biparts::Vector{Bipart}, shared::SharedPair)
+    cand = [e for e in shared.C if e in Biparts]
+    isempty(cand) && (cand = Biparts)
+
+    best_root = cand[1]
+    best_depth = 1
+    best_score = (Inf, Inf)
+
+    for r in cand
+        gt = Compute_GraphTree(Biparts, r)
+
+        dl = isempty(gt[r].rside) ? 0 : maximum(_depth(gt, e, r) for e in gt[r].rside)
+        dr = isempty(gt[r].lside) ? 0 : maximum(_depth(gt, e, r) for e in gt[r].lside)
+
+        dmax = max(dl, dr)
+        score = (abs(dl - dr), dmax)
+
+        if score < best_score
+            best_score = score
+            best_root = r
+            best_depth = max(dmax, 1)
+        end
+    end
+
+    return best_root, max(1, best_depth/5)
+end
 
 
+
+
+function path_snapshot(
+    path::Vector{SupportPair},
+    shared::SharedPair,
+    t;
+    root::Union{Nothing,Bipart}=nothing, depth=1,
+    default_length::Float64=1.0,
+    gap_ratio::Float64=-0.05,)
+    ts = t isa Real ? [float(t)] : Float64.(t)
+
+    Wraws = [geodesic_tree_at(path, shared, τ) for τ in ts]
+    scale = maximum(maximum(values(W)) for W in Wraws)
+
+    K = length(path)
+    warm, cool = support_colors(K)
+
+    colors = Dict{Bipart,Colorant}()
+    for k in 1:K
+        for e in path[k].A
+            colors[e] = warm[k]
+        end
+        for e in path[k].B
+            colors[e] = cool[k]
+        end
+    end
+    for e in shared.C
+        colors[e] = colorant"black"
+    end
+
+    out = Plots.Plot[]
+
+    for (τ, Wraw) in zip(ts, Wraws)
+        Wt = Dict(e => w / scale for (e, w) in Wraw)
+
+        if isnothing(root) 
+            r, r_depth = best_common_root(collect(keys(Wt)), shared)
+        else
+            r = root
+        end
+
+        gt = Compute_GraphTree(collect(keys(Wt)), r)
+
+        plt1 = draw_tree(
+            gt,
+            r;
+            weights=Wt,
+            colors=colors,
+            default_length=default_length,
+            gap_ratio=gap_ratio,
+            depth=depth
+        )
+
+        plt2 = plot_support_path(path, shared)
+        ymax = maximum(ylims(plt2))
+        plot!(
+            plt2,
+            [τ, τ],
+            [0, ymax],
+            linestyle=:dash,
+            color=:gray,
+            lw=2,
+            label="t = $(round(τ; digits=3))",
+        )
+
+        push!(out, plot(plt1, plt2; layout=(2, 1), size=(850, 1100)))
+    end
+
+    return t isa Real ? out[1] : out
+end

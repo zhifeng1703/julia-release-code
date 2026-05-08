@@ -1,5 +1,5 @@
 include("treeDriver.jl")
-#include("treeGeoCompare.jl")
+include("treeGeoCompare.jl")
 include("treeGraph.jl")
 
 catTree, catTaxa = read_trees("test/allCatTrees.tre")
@@ -7,65 +7,37 @@ catTree, catTaxa = read_trees("test/allCatTrees.tre")
 cov = bipartition_covariance(catTree)
 write_lower_triangle("test/covariance.out", cov.covariance)
 
-initial, shared, inc = geodesic_initial(catTree[13], catTree[69])
-path, info = refine_support(
-    initial, shared, inc;
-    abstol=0.0,
-    reltol=0.0,
-)
+# initial, shared, inc = geodesic_initial(catTree[13], catTree[69]) 
+# geodesic, info = refine_support(
+#     initial, shared, inc;
+#     abstol=0.0,
+#     reltol=0.0,
+# )# Geodesic computation
 
-plt = plot_support_path(path, shared)
-display(plt)
+# geodesic_plots = path_snapshot(geodesic, shared, range(0,1,100);depth=1.5) #depth control the canvas size
+# anim_geodesic = @animate for t in range(0,1,100)
+#     path_snapshot(geodesic, shared, t;depth=1.5)
+# end
+# gif(anim_geodesic, "tree_geodesic.gif"; fps=10)
 
+# path, info = refine_support(
+#     initial, shared, inc;
+#     abstol=0.0,
+#     reltol=5e-2,
+# )# Geodesic computation
 
-Wt = geodesic_tree_at(path, shared, 0.35)
+# anim_path = @animate for t in range(0,1,100)
+#     path_snapshot(path, shared, t;depth = 1.5)
+# end
+# gif(anim_path, "tree_path.gif"; fps=10)
 
-root = first(shared.C)              # or choose a specific stable root
-gt = Compute_GraphTree(collect(keys(Wt)), root)
+compare_geodesic(catTree[13], catTree[69]; abstol=0.0, reltol=5e-2)
 
-plt = draw_tree(
-    gt,
-    root;
-    weights=Wt,
-    default_length=1.0,
-    gap_ratio=0.05,
-)
-
-display(plt)
 
 #dist_rf = rf_distance_matrix(catTree)
 #write_lower_triangle("test/rf_distance.out", dist_rf)
 
-#cat_out = test_geodesic_matrix(catTree[1:50], catTree[51:100]; abstol=0, reltol=5e-2, nrepeat=10)
-
-#display(cat_out.plt_count)
-#display(cat_out.plt_cost)
-
-#plots_13_19 = plot_exact_geodesic_with_tol_skip(
-#    catTree[13],
-#    catTree[50 + 19];
-#    abstol=0,
-#    reltol=5e-2,
-#)
-
-#for p in plots_13_19
-#    display(p)
-#end
-
-
-geodata = geodesic_data(catTree[13], catTree[69])
-
-geodesic = refine_support(
-    geodata.c, geodata.a, geodata.b, geodata.edgea, geodata.edgeb, geodata.inc;
-    abstol=0.0,
-    reltol=0.0,
-)
-
-supp_pairs = collect(zip(geodesic.supp_a, geodesic.supp_b))
-
-clades, weights = geodesic_tree_at(0.35, merge(geodata, geodesic), supp_pairs)
-
-p = draw_tree(clades)
+cat_out = test_geodesic_matrix(catTree[1:50], catTree[51:100]; abstol=0, reltol=5e-2, nrepeat=10);
 
 
 # mammalTree, mammalTaxa = read_trees("test/mammalTrees.tre")
